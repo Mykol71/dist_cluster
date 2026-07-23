@@ -1,4 +1,4 @@
-!/usr/bin/env bash
+#!/usr/bin/env bash
 
 # CONFIGURATION
 MAX_JOBS=4 # Maximum parallel jobs allowed
