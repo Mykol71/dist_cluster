@@ -1,72 +1,83 @@
 #!/usr/bin/env bash
 
 # CONFIGURATION
-# List the exact host aliases you defined in your ~/.ssh/config file
 IPHONE_NODES=("iphoneA" "iphoneB")
-
-# The local folder on your PC containing your Python files
 LOCAL_PROJECT_DIR="./src"
-
-# The target directory path on the iPhones where code will live
 REMOTE_PROJECT_DIR="/app"
 
+# Define the Python libraries your GPU project needs
+REQUIRED_PIP_PACKAGES=("numpy") # Note: use "mlx" if running on native Apple Silicon environments
+
 echo "=================================================="
-echo "🚀 Initializing Parallel Python Deployment to Cluster"
+echo "🚀 Initializing Parallel Deployment & Dependency Engine"
 echo "=================================================="
 
-# Function to handle deployment for a single node
-deploy_to_node() {
+deploy_and_verify_node() {
 local node="$1"
-# 1. Ping test the SSH connection to ensure the phone is awake/online
+# 1. Connectivity Check
 if ! ssh -q -o ConnectTimeout=5 "$node" exit; then
-echo "❌ [$node] Offline or unreachable. Skipping."
+echo "❌ [$node] Offline or unreachable."
 return 1
 fi
-echo "🔗 [$node] Connection verified. Preparing remote directories..."
+echo "🔗 [$node] Connected. Checking environment system..."
 
-# 2. Ensure the remote project directory exists on the iPhone
+# 2. Package Manager & Python Detection
+# Detects if node is iSH (Alpine) or Native iOS (uses apt/sileo/dpkg)
+local is_alpine=$(ssh "$node" "command -v apk")
+if [ -n "$is_alpine" ]; then
+echo "📦 [$node] Detected iSH (Alpine Linux). Verifying system packages..."
+# Install Python3, Pip, and compiler build tools needed for native library compilation
+ssh "$node" "apk update && apk add --no-cache python3 py3-pip python3-dev gcc g++ make gfortran musl-dev" > /dev/null 2>&1
+else
+echo "📦 [$node] Detected Native iOS / Darwin. Verifying system packages..."
+# Fallback check for native environment package managers
+ssh "$node" "command -v apt-get >/dev/null && apt-get update && apt-get install -y python3 python3-pip python3-dev build-essential" > /dev/null 2>&1
+fi
+
+# Double check Python installation success
+if ! ssh "$node" "command -v python3" > /dev/null 2>&1; then
+echo "❌ [$node] Python3 could not be installed automatically. Install it manually."
+return 1
+fi
+
+# 3. PIP Dependency Check Loop
+echo "🐍 [$node] Verifying Python library dependencies..."
+for pkg in "${REQUIRED_PIP_PACKAGES[@]}" do
+if ! ssh "$node" "python3 -c 'import $pkg'" > /dev/null 2>&1; then
+echo "📥 [$node] Installing missing package: $pkg..."
+# --break-system-packages overrides standard Python global environment blockades in newer systems
+ssh "$node" "python3 -m pip install --upgrade pip && python3 -m pip install $pkg --break-system-packages" > /dev/null 2>&1
+if ! ssh "$node" "python3 -c 'import $pkg'" > /dev/null 2>&1; then
+echo "❌ [$node] Failed to install package: $pkg"
+return 1
+fi
+fi
+done
+echo "✨ [$node] Environment verified. All dependencies are green!"
+
+# 4. File Synchronization
 ssh "$node" "mkdir -p $REMOTE_PROJECT_DIR"
-if [ $? -ne 0 ]; then
-echo "❌ [$node] Failed to create directory: $REMOTE_PROJECT_DIR"
-return 1
-fi
-
-# 3. Securely copy files over the internet tunnel using rsync or scp
-echo "📦 [$node] Syncing Python files..."
-# Using scp (built-in fallback). It copies all python files from the local directory
+echo "📦 [$node] Syncing Python project source files..."
 scp -r "$LOCAL_PROJECT_DIR"/* "$node":"$REMOTE_PROJECT_DIR/" > /dev/null 2>&1
 
 if [ $? -eq 0 ]; then
-echo "✅ [$node] Deployment successful!"
+echo "✅ [$node] Fully deployed and ready for parallel execution!"
 else
 echo "❌ [$node] File transfer failed during copy phase."
 return 1
 fi
 }
 
-# MAIN EXECUTION LOOP
-echo "Starting parallel push to ${#IPHONE_NODES[@]} devices..."
+# MAIN PARALLEL LOOP
+echo "Spinning up asynchronous installer threads for ${#IPHONE_NODES[@]} nodes..."
 echo "--------------------------------------------------"
 
-# Loop through all nodes and launch the deployment function in the background
 for node in "${IPHONE_NODES[@]}" do
-deploy_to_node "$node" &
+deploy_and_verify_node "$node" &
 done
 
-# Wait for all background parallel deployment tasks to finish
+# Wait for all environmental verification and code deployment loops to complete
 wait
 
 echo "--------------------------------------------------"
-echo "🎉 Deployment cycle complete. Checking cluster status..."
-
-# Optional: Run a quick remote diagnostic command in parallel across all phones
-for node in "${IPHONE_NODES[@]}" do
-(
-files_count=$(ssh "$node" "ls -1 $REMOTE_PROJECT_DIR/*.py 2>/dev/null | wc -l")
-echo "📊 [$node] Currently hosting $files_count python script(s) in $REMOTE_PROJECT_DIR"
-) &
-done
-
-wait
-echo "Ready to run your parallel VRAM workloads!"
-
+echo "🎉 Cluster environment setup finalized!"

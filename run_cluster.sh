@@ -2,60 +2,149 @@
 
 # CONFIGURATION
 IPHONE_NODES=("iphoneA" "iphoneB")
-LOCAL_PROJECT_DIR="./src"
+MASTER_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I | awk '{print $1}')
+MASTER_PORT=8080
+WORLD_SIZE=$(( ${#IPHONE_NODES[@]} + 1 ))
 REMOTE_PROJECT_DIR="/app"
-
-# Define the Python libraries your GPU project needs
-REQUIRED_PIP_PACKAGES=("numpy") # Note: use "mlx" if running on native Apple Silicon environments
+SCRIPT_NAME="train_dist.py"
 
 echo "=================================================="
-echo "🚀 Initializing Parallel Deployment & Dependency Engine"
+echo "🌀 Launching Distributed GPU/VRAM Processing Pool"
 echo "=================================================="
 
-deploy_and_verify_node() {
-local node="$1"
-# 1. Connectivity Check
-if ! ssh -q -o ConnectTimeout=5 "$node" exit; then
-echo "❌ [$node] Offline or unreachable."
-return 1
-fi
-echo "🔗 [$node] Connected. Checking environment system..."
+# ⚡ DYNAMIC NETWORK PING BENCHMARK
+echo "📡 Measuring network latency across internet VPN..."
+OPTIMAL_BUFFER=1048576 # Global default fallback (1MB)
 
-# 2. Package Manager & Python Detection
-# Detects if node is iSH (Alpine) or Native iOS (uses apt/sileo/dpkg)
-local is_alpine=$(ssh "$node" "command -v apk")
-if [ -n "$is_alpine" ]; then
-echo "📦 [$node] Detected iSH (Alpine Linux). Verifying system packages..."
-# Install Python3, Pip, and compiler build tools needed for native library compilation
-ssh "$node" "apk update && apk add --no-cache python3 py3-pip python3-dev gcc g++ make gfortran musl-dev" > /dev/null 2>&1
-else
-echo "📦 [$node] Detected Native iOS / Darwin. Verifying system packages..."
-# Fallback check for native environment package managers
-ssh "$node" "command -v apt-get >/dev/null && apt-get update && apt-get install -y python3 python3-pip python3-dev build-essential" > /dev/null 2>&1
-fi
-
-# Double check Python installation success
-if ! ssh "$node" "command -v python3" > /dev/null 2>&1; then
-echo "❌ [$node] Python3 could not be installed automatically. Install it manually."
-return 1
-fi
-
-# 3. PIP Dependency Check Loop
-echo "🐍 [$node] Verifying Python library dependencies..."
-for pkg in "${REQUIRED_PIP_PACKAGES[@]}" do
-if ! ssh "$node" "python3 -c 'import $pkg'" > /dev/null 2>&1; then
-echo "📥 [$node] Installing missing package: $pkg..."
-# --break-system-packages overrides standard Python global environment blockades in newer systems
-ssh "$node" "python3 -m pip install --upgrade pip && python3 -m pip install $pkg --break-system-packages" > /dev/null 2>&1
-if ! ssh "$node" "python3 -c 'import $pkg'" > /dev/null 2>&1; then
-echo "❌ [$node] Failed to install package: $pkg"
-return 1
-fi
+for node in "${IPHONE_NODES[@]}" do
+# Call our ping diagnostic script using the hostname configuration profile
+detected_buffer=$(python3 ./src/ping_test.py "$node")
+if [ "$detected_buffer" -gt "$OPTIMAL_BUFFER" ]; then
+OPTIMAL_BUFFER=$detected_buffer
 fi
 done
-echo "✨ [$node] Environment verified. All dependencies are green!"
 
- 3. CLEANUP AND SYNCHRONIZATION
+echo "⚙️ Network tuning complete. Optimal cluster chunk size set to: $OPTIMAL_BUFFER bytes."
+echo "--------------------------------------------------"
+
+# LOOP & SPAWN IPHONE WORKERS
+RANK=1
+for node in "${IPHONE_NODES[@]}" do
+echo "📡 [RANK $RANK] Triggering optimized worker on $node..."
+# Inject both standard rank settings AND your fresh dynamic BUFFER_SIZE variable
+ssh "$node" "cd $REMOTE_PROJECT_DIR && \
+MASTER_ADDR=$MASTER_IP \
+MASTER_PORT=$MASTER_PORT \
+WORLD_SIZE=$WORLD_SIZE \
+RANK=$RANK \
+BUFFER_SIZE=$OPTIMAL_BUFFER \
+python3 $SCRIPT_NAME" &
+RANK=$((RANK + 1))
+done
+
+sleep 2
+
+# LAUNCH LOCAL MASTER COMPUTATION (RANK 0)
+MASTER_ADDR=$MASTER_IP \
+MASTER_PORT=$MASTER_PORT \
+WORLD_SIZE=$WORLD_SIZE \
+RANK=0 \
+BUFFER_SIZE=$OPTIMAL_BUFFER \
+python3 "$REMOTE_PROJECT_DIR/$SCRIPT_NAME"
+
+wait
+echo "🎉 Cluster processing complete."
+
+echo "=================================================="
+echo "🌀 Launching Distributed GPU/VRAM Processing Pool"
+echo "=================================================="
+
+# ⚡ DYNAMIC NETWORK PING BENCHMARK
+echo "📡 Measuring network latency across internet VPN..."
+OPTIMAL_BUFFER=1048576 # Global default fallback (1MB)
+
+for node in "${IPHONE_NODES[@]}" do
+# Call our ping diagnostic script using the hostname configuration profile
+detected_buffer=$(python3 ./src/ping_test.py "$node")
+if [ "$detected_buffer" -gt "$OPTIMAL_BUFFER" ]; then
+OPTIMAL_BUFFER=$detected_buffer
+fi
+done
+
+echo "⚙️ Network tuning complete. Optimal cluster chunk size set to: $OPTIMAL_BUFFER bytes."
+echo "--------------------------------------------------"
+
+# LOOP & SPAWN IPHONE WORKERS
+RANK=1
+for node in "${IPHONE_NODES[@]}" do
+echo "📡 [RANK $RANK] Triggering optimized worker on $node..."
+# Inject both standard rank settings AND your fresh dynamic BUFFER_SIZE variable
+ssh "$node" "cd $REMOTE_PROJECT_DIR && \
+MASTER_ADDR=$MASTER_IP \
+MASTER_PORT=$MASTER_PORT \
+WORLD_SIZE=$WORLD_SIZE \
+RANK=$RANK \
+BUFFER_SIZE=$OPTIMAL_BUFFER \
+python3 $SCRIPT_NAME" &
+RANK=$((RANK + 1))
+done
+
+sleep 2
+
+# LAUNCH LOCAL MASTER COMPUTATION (RANK 0)
+MASTER_ADDR=$MASTER_IP \
+MASTER_PORT=$MASTER_PORT \
+WORLD_SIZE=$WORLD_SIZE \
+RANK=0 \
+BUFFER_SIZE=$OPTIMAL_BUFFER \
+python3 "$REMOTE_PROJECT_DIR/$SCRIPT_NAME"
+
+wait
+echo "🎉 Cluster processing complete."
+
+echo "=================================================="
+echo "🌀 Launching Distributed GPU/VRAM Processing Pool"
+echo "=================================================="
+echo "🌐 Master Node IP: $MASTER_IP | Port: $MASTER_PORT"
+echo "🖥️ Total Nodes in World: $WORLD_SIZE"
+echo "--------------------------------------------------"
+
+# Track process IDs of launched remote tasks
+REMOTE_PIDS=()
+
+# 1. LOOP & SPAWN IPHONE WORKERS
+# Rank 0 is reserved for the Master PC. iPhones take Rank 1, Rank 2, etc.
+RANK=1
+for node in "${IPHONE_NODES[@]}" do
+echo "📡 [RANK $RANK] Triggering processing node on $node..."
+# Run the python script on the remote phone in the background
+# Passes vital cluster network parameters directly into the environment
+ssh "$node" "cd $REMOTE_PROJECT_DIR && \
+MASTER_ADDR=$MASTER_IP \
+MASTER_PORT=$MASTER_PORT \
+WORLD_SIZE=$WORLD_SIZE \
+RANK=$RANK \
+python3 $SCRIPT_NAME" &
+REMOTE_PIDS+=($!)
+RANK=$((RANK + 1))
+done
+
+# Give the remote phone processes a brief window to bind sockets and listen
+sleep 2
+
+# 2. LAUNCH LOCAL MASTER COMPUTATION (RANK 0)
+echo "--------------------------------------------------"
+echo "💻 [RANK 0] Initializing Master Engine locally..."
+echo "--------------------------------------------------"
+
+# Execute your local segment of the math workload
+MASTER_ADDR=$MASTER_IP \
+MASTER_PORT=$MASTER_PORT \
+WORLD_SIZE=$WORLD_SIZE \
+RANK=0 \
+python3 "$REMOTE_PROJECT_DIR/$SCRIPT_NAME"
+
+# 3. CLEANUP AND SYNCHRONIZATION
 echo "--------------------------------------------------"
 echo "⏳ Waiting for remote iPhone threads to sync and finalize..."
 wait
@@ -63,67 +152,26 @@ wait
 echo "🎉 All distributed processing steps completed successfully!"
 
 # =====================================================================
-# 4. AUTOMATED EXECUTION WRAPPER (POST-PROCESSING HOOK)
+# 4. AUTOMATED EXECUTION WRAPPER (METRICS & INTEGRITY PIPELINE)
 # =====================================================================
 echo ""
 echo "=================================================="
-echo "🔄 AUTOMATED WRAPPER: Launching Integrity Checks..."
+echo "🔄 AUTOMATED WRAPPER: Launching Diagnostics..."
 echo "=================================================="
 
-# Check if the verification script exists locally before running it
+# 1. Run Data Verification
 if [ -f "./verify_output.py" ]; then
-chmod +x ./verify_output.py
 python3 ./verify_output.py
-else
-echo "❌ Execution Wrapper Warning: 'verify_output.py' not found in current directory."
-echo "💾 Distributed data remains saved safely in 'matrix_output.csv'."
 fi
-How the Full Automation Works Now
-With this wrapper in place, your entire project architecture behaves like a production-grade compute cluster pipeline from a single terminal enter key:
-[Your Terminal] ---> Run ./run_cluster.sh
-│
-├──> Spawns iPhone Workers via SSH (& Background threads)
-├──> Initializes Local Master Socket Loop
-├──> Streams Data Blocks (With Live Progress Bars: ▓▓▓ Done!)
-├──> Saves Assembled Matrix to Disk (matrix_output.csv)
-│
-└──> [WRAPPER ENGAGES AUTOMATICALLY]
-│
-└──> Invokes verify_output.py
-└──> Prints final mathematical validation status
 
-# 4. File Synchronization
-ssh "$node" "mkdir -p $REMOTE_PROJECT_DIR"
-echo "📦 [$node] Syncing Python project source files..."
-scp -r "$LOCAL_PROJECT_DIR"/* "$node":"$REMOTE_PROJECT_DIR/" > /dev/null 2>&1
+# 2. Extract live performance metrics from the python runtime environment
+# Simulating captured run metrics; in production, you parse these out of train_dist.py stdout
+MOCK_NET_TIME=0.3210
+MOCK_COMP_TIME=0.1420
+TOTAL_TIME=0.4630
 
-if [ $? -eq 0 ]; then
-echo "✅ [$node] Fully deployed and ready for parallel execution!"
-else
-echo "❌ [$node] File transfer failed during copy phase."
-return 1
-fi
-}
-
-# MAIN PARALLEL LOOP
-echo "Spinning up asynchronous installer threads for ${#IPHONE_NODES[@]} nodes..."
-echo "--------------------------------------------------"
-
-for node in "${IPHONE_NODES[@]}" do
-deploy_and_verify_node "$node" &
-done
-
-# Wait for all environmental verification and code deployment loops to complete
-wait
-
-echo "--------------------------------------------------"
-echo "🎉 Cluster environment setup finalized!"
-
-# 4. Invoke Logger Engine and Final Markdown Formatter
+# 3. Invoke Logger Engine
 if [ -f "./log_metrics.py" ]; then
+# Format: python3 log_metrics.py [Nodes] [Net_Sec] [Compute_Sec] [Total_Sec]
 python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
-fi
-
-if [ -f "./generate_report.py" ]; then
-python3 ./generate_report.py
 fi

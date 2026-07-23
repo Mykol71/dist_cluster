@@ -1,4 +1,5 @@
 Part 1: Project Presentation Slides Outline
+
 Use this structured outline to build your presentation slides (PowerPoint, Keynote, or Google Slides). It highlights the innovative architecture of using Bash to orchestrate resource pools over an internet VPN. [3, 4, 5, 6]
 slide 1: Title & Overview
 
@@ -21,7 +22,6 @@ The Network Bottleneck: Internet routing introduces erratic ping latencies that 
 Dynamic Packet Tuning: An automated network ping test executes right before data distribution.
 Low Latency (Wi-Fi): Drops down to responsive 256KB packet chunks.
 High Latency (Cellular/LTE): Automatically scales to large 2MB streaming data blocks to maximize throughput.
-
 slide 5: Technical Execution Workflow
 
 Deployment: deploy_cluster.sh uses parallel background tasks to sync code, detect operating systems (iSH Alpine vs Native iOS), and configure dependencies automatically.

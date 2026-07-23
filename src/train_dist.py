@@ -4,13 +4,14 @@ import sys
 import time
 
 # 1. PARSE BASH CLUSTER CONFIGURATION
+# PARSE DYNAMIC ENVIRONMENT PARAMETERS SENT BY BASH CONTROLLER
 MASTER_ADDR = os.getenv("MASTER_ADDR", "127.0.0.1")
 MASTER_PORT = int(os.getenv("MASTER_PORT", "8080"))
 WORLD_SIZE = int(os.getenv("WORLD_SIZE", "1"))
 RANK = int(os.getenv("RANK", "0"))
 
-# OPTIMIZED NETWORK CHUNK SIZE: 1MB buffer for fast internet streaming
-BUFFER_SIZE = 1048576
+# Dynamically fall back to 1MB if the network variable isn't injected
+BUFFER_SIZE = int(os.getenv("BUFFER_SIZE", "1048576"))
 
 print(f"🔹 [Node Rank {RANK}] Worker initialization complete.")
 
