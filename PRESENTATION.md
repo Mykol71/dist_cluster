@@ -38,3 +38,7 @@ slide 6: Key Findings & Performance Scaling
 --
 Compute vs. Network Cost: iPhone hardware handles local matrix multiplication instantly, but internet bandwidth limits linear speedup scaling.
 Amdahl's Law in Action: The project illustrates how a slower communication layer introduces parallel overhead, demonstrating real-world high-performance computing (HPC) constraints.
+
+Notes:
+- There are approximately 1.52 billion active iPhone users worldwide.
+- To match the raw compute and VRAM footprint of a single NVIDIA RTX 3090 (35.6 FP16 TFLOPS, 24GB VRAM), you would need a cluster of roughly 15 to 20 iPhone 15 Pro Max devices.
