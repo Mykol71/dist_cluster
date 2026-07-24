@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI LLM Use Case - Distributed Cluster</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+      color: #e6edf3;
+      background: #0d1117;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    h1 { font-size: 2rem; border-bottom: 2px solid #30363d; padding-bottom: 0.4rem; margin-top: 2rem; }
+    h2 { font-size: 1.5rem; border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+
+    p { margin: 0.75rem 0; }
+
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.875em;
+      padding: 0.15em 0.4em;
+    }
+
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    ul, ol { padding-left: 1.5rem; margin: 0.75rem 0; }
+    li { margin: 0.35rem 0; }
+
+    hr { border: none; border-top: 1px solid #30363d; margin: 2rem 0; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      border: 1px solid #30363d;
+      padding: 0.55rem 0.9rem;
+      text-align: left;
+    }
+
+    th { background: #161b22; font-weight: 600; }
+    tr:nth-child(even) td { background: #161b22; }
+
+    .mermaid {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin: 1.25rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    blockquote {
+      border-left: 3px solid #58a6ff;
+      margin: 1rem 0;
+      padding: 0.5rem 1rem;
+      background: #161b22;
+      border-radius: 0 6px 6px 0;
+      color: #c9d1d9;
+    }
+
+    footer {
+      margin-top: 3rem;
+      color: #8b949e;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p><a href="../index.html">← Back to project overview</a></p>
+
+    <h1>AI LLM Use Case — Distributed Cluster Inference</h1>
+
+    <p>
+      This document describes how the distributed compute cluster can be extended to run
+      large language model (LLM) inference across multiple Apple Silicon devices using
+      <strong>MLX</strong> and the existing VPN mesh infrastructure.
+    </p>
+
+    <hr />
+
+    <h2>Overview</h2>
+
+    <p>
+      Modern LLMs are too large to fit in the memory of a single consumer device. A
+      distributed approach splits the model layers across several nodes, pipelines token
+      generation, and aggregates results back on the master node — all over the encrypted
+      VPN mesh that already powers this cluster.
+    </p>
+
+    <blockquote>
+      <strong>Key insight:</strong> Apple Silicon iPhones and Macs share CPU/GPU memory in a unified
+      memory architecture (UMA). MLX is purpose-built to exploit this, making
+      device-local token generation fast. The cluster turns that per-device speed into
+      collective inference capacity.
+    </blockquote>
+
+    <hr />
+
+    <h2>Architecture</h2>
+
+    <div class="mermaid">
+graph TB
+    subgraph OL["Orchestration Layer"]
+        ORCH["🖥️ Master Node\nModel coordinator\n(run_cluster.sh)"]
+    end
+    subgraph NL["Network Layer"]
+        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)"]
+    end
+    subgraph CL["Inference Layer"]
+        W1["📱 iPhone A\nLayers 0–15\nMLX inference"]
+        W2["📱 iPhone B\nLayers 16–31\nMLX inference"]
+    end
+    ORCH <-->|"Prompt + KV cache shards"| VPN
+    VPN <-->|"Hidden states / logits"| W1
+    VPN <-->|"Hidden states / logits"| W2
+    </div>
+
+    <hr />
+
+    <h2>Pipeline Strategy</h2>
+
+    <p>
+      LLM inference is split using <strong>pipeline parallelism</strong>: each worker node owns a
+      consecutive slice of the model's transformer layers. The activation tensor from the
+      last layer of one shard is forwarded to the next node over the VPN.
+    </p>
+
+    <div class="mermaid">
+flowchart LR
+    PROMPT([📝 User Prompt]) --> TOK["Tokenize\n(master)"]
+    TOK --> W1["iPhone A\nLayers 0–15"]
+    W1 -->|"Hidden state"| W2["iPhone B\nLayers 16–31"]
+    W2 -->|"Final logits"| SAMPLE["Sample / decode\n(master)"]
+    SAMPLE --> TOKEN([🔤 Next token])
+    TOKEN -->|"Append &amp; loop"| TOK
+    </div>
+
+    <hr />
+
+    <h2>Adaptive Packet Sizing for LLM Payloads</h2>
+
+    <p>
+      Hidden-state tensors are large (sequence &times; hidden-dim &times; dtype bytes). The existing
+      <code>ping_test.py</code> latency probe drives the same adaptive buffer logic used for matrix
+      workloads:
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>Condition</th><th>Buffer size</th><th>Rationale</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Low latency ≤ 20 ms (Wi-Fi)</td><td>256 KB chunks</td><td>Minimize per-token round-trip</td></tr>
+        <tr><td>High latency &gt; 20 ms (LTE)</td><td>2 MB blocks</td><td>Amortize transfer overhead</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Setup</h2>
+
+    <h3>Prerequisites</h3>
+    <ul>
+      <li>All nodes connected via Tailscale or WireGuard (see <a href="ssh_hardening.md">ssh_hardening.md</a>).</li>
+      <li>MLX installed on every node: <code>pip install mlx mlx-lm</code></li>
+      <li>A compatible model downloaded and sharded across node storage (e.g., Llama-3 8B).</li>
+    </ul>
+
+    <h3>1. Shard the model weights</h3>
+    <pre><code># On master — split a Hugging Face checkpoint into per-node layer slices
+python3 src/shard_model.py \
+  --model-path ./models/llama3-8b \
+  --num-shards 2 \
+  --output-dir ./shards</code></pre>
+
+    <h3>2. Sync shards to worker nodes</h3>
+    <pre><code>bash deploy_cluster.sh   # existing deploy script handles rsync to each node</code></pre>
+
+    <h3>3. Start the inference cluster</h3>
+    <pre><code>bash run_cluster.sh --mode llm --prompt "Explain pipeline parallelism."</code></pre>
+
+    <hr />
+
+    <h2>Execution Workflow</h2>
+
+    <div class="mermaid">
+sequenceDiagram
+    participant M as 🖥️ Master Node
+    participant A as 📱 iPhone A (Layers 0–15)
+    participant B as 📱 iPhone B (Layers 16–31)
+
+    Note over M,B: Phase 1 — Deploy model shards
+    M->>A: rsync shards/0/ → /app/model/
+    M->>B: rsync shards/1/ → /app/model/
+    A-->>M: ✅ shard ready
+    B-->>M: ✅ shard ready
+
+    Note over M,B: Phase 2 — Profile network
+    M->>A: ping_test.py → buffer recommendation
+    M->>B: ping_test.py → buffer recommendation
+    M->>M: set OPTIMAL_BUFFER
+
+    Note over M,B: Phase 3 — Autoregressive inference loop
+    M->>A: input_ids (tokenized prompt)
+    A->>B: hidden_states after layer 15
+    B->>M: logits from layer 31
+    M->>M: sample next token
+    M->>A: updated KV cache + next token
+    Note over M,B: Repeat until EOS or max_tokens
+
+    Note over M,B: Phase 4 — Report
+    M->>M: log_metrics.py (tokens/sec, latency)
+    M->>M: generate_report.py → llm_performance.csv
+    </div>
+
+    <hr />
+
+    <h2>Performance Considerations</h2>
+
+    <table>
+      <thead>
+        <tr><th>Factor</th><th>Impact</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Model size</strong></td><td>Larger models benefit more from distribution; small models may be faster on a single device.</td></tr>
+        <tr><td><strong>Sequence length</strong></td><td>Longer contexts increase hidden-state transfer size each step.</td></tr>
+        <tr><td><strong>Network latency</strong></td><td>Each forward pass incurs one full round-trip between shards; Wi-Fi strongly preferred.</td></tr>
+        <tr><td><strong>Apple Silicon UMA</strong></td><td>No CPU↔GPU copy overhead; each node's GPU and CPU share the same memory pool.</td></tr>
+        <tr><td><strong>Amdahl's Law</strong></td><td>Communication overhead grows with shard count; 2–3 nodes is typically optimal for consumer hardware.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Known Constraints</h2>
+
+    <table>
+      <thead>
+        <tr><th>Constraint</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>iOS background limits</strong></td><td>iOS may suspend long-running inference jobs; keep the display active.</td></tr>
+        <tr><td><strong>WAN jitter</strong></td><td>Token latency spikes when the hidden-state transfer stalls; the orchestrator retries on timeout.</td></tr>
+        <tr><td><strong>KV cache size</strong></td><td>Each node caches only its own layers; the master coordinates cache consistency.</td></tr>
+        <tr><td><strong>Model compatibility</strong></td><td>Only models with clean layer-wise APIs (HuggingFace / MLX) are straightforward to shard.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Related Documents</h2>
+
+    <table>
+      <thead>
+        <tr><th>Document</th><th>Contents</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><a href="ssh_hardening.md">ssh_hardening.md</a></td><td>Securing SSH access across VPN nodes</td></tr>
+        <tr><td><a href="latency_benchmark_samples.md">latency_benchmark_samples.md</a></td><td>Ping/CSV output and buffer-size decisions</td></tr>
+        <tr><td><a href="run_commands.md">run_commands.md</a></td><td>Reproducible commands for the full workflow</td></tr>
+        <tr><td><a href="Technical_Guide.html">Technical_Guide.html</a></td><td>Extended architecture notes</td></tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <a href="mailto:mgreen@mykol.com">mgreen@mykol.com</a>
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
+</body>
+</html>
