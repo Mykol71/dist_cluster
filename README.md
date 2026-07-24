@@ -104,7 +104,6 @@ slide 6: Key Findings & Performance Scaling
 - **Adaptive tuning:** Network latency is profiled before each run to set an optimal packet buffer size.
 
 ---
->>>>>>> origin/master
 
 ## Quick Start
 
