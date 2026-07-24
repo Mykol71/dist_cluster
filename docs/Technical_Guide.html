@@ -105,7 +105,7 @@
     <h2>High-Level Architecture</h2>
 
     <div class="mermaid">
-flowchart TD
+    graph TB
     subgraph OL["Orchestration Layer"]
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
@@ -199,18 +199,16 @@ print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
     <h3>Matrix Data-Flow Diagram</h3>
 
     <div class="mermaid">
-flowchart LR
-    MAT["📐 Large Matrix\nWorkload"] --> SPLIT["Master: split\ninto row chunks"]
-    SPLIT --> R0["Chunk → Rank 0"]
-    SPLIT --> R1["Chunk → Rank 1"]
-    SPLIT --> R2["Chunk → Rank 2"]
-    R0 --> M["🖥️ Master Node\nlocal dot-product"]
-    R1 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
-    R2 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
-    M --> AGG["all_sum collective\n(aggregate results)"]
-    W1 --> AGG
-    W2 --> AGG
-    AGG --> OUT["✅ Final Result\n+ cluster_performance.csv"]
+    flowchart LR
+        START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
+        PING --> CHECK{Latency?}
+        CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
+        CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+        SMALL --> DIST["Distribute work\nto worker ranks"]
+        LARGE --> DIST
+        DIST --> COMPUTE["Workers compute\ndot-product loops"]
+        COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+        AGG --> DONE([✅ Result])
     </div>
 
     <hr />
@@ -240,12 +238,35 @@ flowchart LR
     <h2>Suggested Validation Workflow</h2>
 
     <div class="mermaid">
-flowchart TD
-    S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
-    S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
-    S3 --> S4["4️⃣ Run all_sum smoke test\n(small distributed round-trip)"]
-    S4 --> S5["5️⃣ Scale workload gradually"]
-    S5 --> LOG["📊 Log metrics\nnetwork time · compute time · wall-clock time"]
+    sequenceDiagram
+        participant M as 🖥️ Master Node
+        participant A as 📱 iPhone A (Rank 1)
+        participant B as 📱 iPhone B (Rank 2)
+
+        Note over M,B: Phase 1 — Deploy
+        M->>A: deploy_cluster.sh: sync src/, install deps
+        M->>B: deploy_cluster.sh: sync src/, install deps
+        A-->>M: ✅ environment ready
+        B-->>M: ✅ environment ready
+
+        Note over M,B: Phase 2 — Profile
+        M->>A: ping_test.py (latency probe)
+        M->>B: ping_test.py (latency probe)
+        A-->>M: latency / buffer size
+        B-->>M: latency / buffer size
+        M->>M: set OPTIMAL_BUFFER
+
+        Note over M,B: Phase 3 — Compute
+        M->>A: SSH: start worker rank 1
+        M->>B: SSH: start worker rank 2
+        M->>M: launch rank 0 locally
+        A-->>M: matrix chunk result
+        B-->>M: matrix chunk result
+
+        Note over M,B: Phase 4 — Verify & Report
+        M->>M: verify_output.py (delta check)
+        M->>M: log_metrics.py (telemetry)
+        M->>M: generate_report.py → cluster_performance.csv
     </div>
 
     <hr />
