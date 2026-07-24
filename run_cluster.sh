@@ -113,6 +113,7 @@ local_network_id() {
   local first_octet
   first_octet=$(printf '%s\n' "$ip" | awk -F. '{print $1}')
   case "$first_octet" in
+    # Requirement-defined local families: 192.*, 10.*, 172.*
     10|172|192)
       printf '%s\n' "$first_octet"
       ;;
@@ -129,12 +130,12 @@ get_local_ipv4s() {
   fi
 
   if command -v ifconfig >/dev/null 2>&1; then
-    ifconfig 2>/dev/null | awk '/inet /{print $2}' | grep -v '^127\.' || true
+    ifconfig 2>/dev/null | awk '/inet /{gsub(/addr:/, "", $2); print $2}' | grep -v '^127\.' || true
     return 0
   fi
 
   if command -v hostname >/dev/null 2>&1; then
-    hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^127\.' || true
+    (hostname -I 2>/dev/null || hostname -i 2>/dev/null) | tr ' ' '\n' | grep -v '^127\.' || true
   fi
 }
 
@@ -160,7 +161,7 @@ resolve_node_ipv4() {
   fi
 
   if command -v nslookup >/dev/null 2>&1; then
-    nslookup "$candidate" 2>/dev/null | awk '/^Address: /{print $2; exit}'
+    nslookup "$candidate" 2>/dev/null | awk '/^Address/{print $NF; exit}'
   fi
 }
 
@@ -189,7 +190,7 @@ determine_node_master_addr() {
   if [ -n "$node_ip" ]; then
     local_master_ip=$(detect_local_master_ip_for_node "$node_ip" 2>/dev/null || true)
     if [ -n "$local_master_ip" ]; then
-      echo "🏠 [$node] Node IP $node_ip shares local network with host. Using host LAN IP $local_master_ip (VPN host config not required)." >&2
+      echo "🏠 [$node] Node IP $node_ip shares local network with host. Using host LAN IP $local_master_ip (VPN host config not required)."
       printf '%s\n' "$local_master_ip"
       return 0
     fi
