@@ -178,6 +178,6 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
 
-`run_cluster.sh` is local-network aware for IPv4 ranges that start with `192.*`, `10.*`, or `172.*`. If a worker node resolves to the same local network family as the host, workers connect to the host's LAN IP and no VPN host configuration is required for that worker.
+`run_cluster.sh` is local-network aware for IPv4 ranges that start with `192.*`, `10.*`, or `172.*` (project rule). If a worker node resolves to the same local network family as the host, workers connect to the host's LAN IP and no VPN host configuration is required for that worker. If your cluster mixes LAN-local and VPN-only workers in one run, set `ALLOW_MASTER_WILDCARD_BIND=1` so rank 0 can bind on `0.0.0.0`.
 
 mgreen@mykol.com

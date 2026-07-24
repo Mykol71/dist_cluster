@@ -15,6 +15,7 @@ or VPN IPs for nodes connected through Tailscale/WireGuard.
 | `WORKER_B_IP`  | `192.168.1.55` or `100.11.22.55` | IP of worker node B (`workerB`) |
 | `SSH_USER`     | `mobile`            | SSH user on worker nodes             |
 | `REMOTE_DIR`   | `/app` or `~/dist_cluster` | Working directory on worker nodes |
+| `ALLOW_MASTER_WILDCARD_BIND` | `1` | Required only when mixing LAN-local and VPN-only workers in one run |
 
 Add the worker aliases to `~/.ssh/config` on the orchestrator for convenience:
 

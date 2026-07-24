@@ -301,7 +301,7 @@ echo "--------------------------------------------------"
 
 # ── 1. LATENCY PROFILING ────────────────────────────────────────────────────
 
-echo "📡 Measuring network latency across available private paths (LAN/VPN)..."
+echo "📡 Measuring network latency across active worker paths (LAN/VPN, with local detection by 192/10/172 family)..."
 OPTIMAL_BUFFER=1048576  # default fallback (1 MB)
 
 for node in "${WORKER_NODES[@]}"; do
@@ -377,10 +377,15 @@ echo "--------------------------------------------------"
 MASTER_BIND_IP="$MASTER_IP"
 if [ "$REQUIRES_MULTI_INTERFACE_BIND" -eq 1 ]; then
   # Mixed LAN/VPN workers may require different host-reachable addresses.
-  # Bind all interfaces and rely on host firewall/private network controls.
-  MASTER_BIND_IP="0.0.0.0"
-  echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
-  echo "⚠️  Ensure host firewall rules allow trusted LAN/VPN worker sources only."
+  # For safety, require explicit opt-in before binding all interfaces.
+  if [ "${ALLOW_MASTER_WILDCARD_BIND:-0}" = "1" ]; then
+    MASTER_BIND_IP="0.0.0.0"
+    echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
+    echo "⚠️  Ensure host firewall rules allow trusted LAN/VPN worker sources only."
+  else
+    echo "❌ Mixed LAN/VPN worker routing detected. Set ALLOW_MASTER_WILDCARD_BIND=1 to allow binding rank 0 to 0.0.0.0." >&2
+    exit 1
+  fi
 fi
 
 MASTER_ADDR=$MASTER_BIND_IP \
