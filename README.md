@@ -149,7 +149,7 @@ src/ping_test.py             # Network latency probe (returns buffer recommendat
 docs/ssh_hardening.md        # SSH security hardening guide
 docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
 docs/run_commands.md         # Reproducible copy-paste run commands
-Technical_Guide.md           # Extended architecture notes and context
+docs/Technical_Guide.md      # Extended architecture notes and context
 ```
 
 ---
@@ -172,7 +172,7 @@ Technical_Guide.md           # Extended architecture notes and context
 | [`docs/ssh_hardening.md`](docs/ssh_hardening.md) | Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging |
 | [`docs/latency_benchmark_samples.md`](docs/latency_benchmark_samples.md) | Sample ping/CSV output and scaling decision table |
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
-| [`Technical_Guide.md`](Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
+| [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
 
