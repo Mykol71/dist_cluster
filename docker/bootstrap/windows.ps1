@@ -126,7 +126,7 @@ if ((Test-Path $KeyRsa) -or (Test-Path $KeyEd25519)) {
 } else {
     Log "No SSH keypair found. Generating one..."
     if (-not (Test-Path $SshDir)) { New-Item -ItemType Directory -Path $SshDir | Out-Null }
-    ssh-keygen -t ed25519 -C "dist_cluster" -N '""' -f $KeyEd25519
+    ssh-keygen -t ed25519 -C "dist_cluster" -N "" -f $KeyEd25519
     Ok "SSH keypair generated at $KeyEd25519"
 }
 

@@ -155,6 +155,8 @@ if [ "$ROLE" = "worker" ]; then
     if [ -z "$PUB_KEY" ]; then
         warn "Could not read a public key. Set SSH_PUBLIC_KEY env var or generate a keypair first."
     else
+        # Stop any previously running worker container
+        docker rm -f dist_worker 2>/dev/null || true
         docker run -d \
             --name dist_worker \
             --restart unless-stopped \

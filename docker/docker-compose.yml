@@ -45,10 +45,11 @@ services:
       - worker2
     stdin_open: true
     tty: true
-    # Override WORKER_NODES bash array in scripts via env (see deploy_cluster.sh)
+    # Patch WORKER_NODES in the scripts to use compose service hostnames,
+    # then drop into an interactive shell ready to run the cluster.
     command: >
       bash -c "
-        export WORKER_NODES=(worker1 worker2);
+        sed -i 's/^WORKER_NODES=.*/WORKER_NODES=(worker1 worker2)/' deploy_cluster.sh run_cluster.sh;
         echo '✅ Master container ready. Run: bash deploy_cluster.sh && bash run_cluster.sh';
         exec bash
       "
