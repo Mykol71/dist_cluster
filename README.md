@@ -1,6 +1,6 @@
 # Distributed Compute Cluster
 
-An experimental over-the-Internet distributed compute cluster that coordinates multiple devices (iPhones/mobile nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
+An experimental over-the-Internet distributed compute cluster that coordinates multiple devices (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
 
 > ⚠️ This project is designed for **experimentation and learning**. Over-the-Internet links introduce latency overhead that limits linear speedup — see [Known Constraints](#known-constraints).
 
@@ -97,7 +97,7 @@ slide 6: Key Findings & Performance Scaling
        |
   +----+----+
   |         |
-[iPhone A] [iPhone B]
+[Worker A] [Worker B]
 (RANK 1)  (RANK 2)
 ```
 
@@ -116,6 +116,7 @@ slide 6: Key Findings & Performance Scaling
 - Tailscale or WireGuard installed and connected on all devices.
 - SSH key-based auth configured (see [`docs/ssh_hardening.md`](docs/ssh_hardening.md)).
 - Python 3 + `numpy` (and optionally `mlx`) on all nodes.
+- macOS worker nodes should have either Python 3 preinstalled or Homebrew available so `deploy_cluster.sh` can install it automatically.
 
 ### 1. Deploy dependencies to worker nodes
 
@@ -176,3 +177,5 @@ NOTES.md                     # Extended architecture notes and context
 | [`docs/latency_benchmark_samples.md`](docs/latency_benchmark_samples.md) | Sample ping/CSV output and scaling decision table |
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
 | [`NOTES.md`](NOTES.md) | Extended architecture notes, slide outline, and source quality notes |
+
+By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
