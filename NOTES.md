@@ -5,9 +5,6 @@
 This document describes a distributed compute experiment that coordinates multiple devices over a secure network.  
 Instead of transferring raw VRAM contents across devices, the practical pattern is to split model/workload state across nodes (for example, tensor/model/data parallel strategies) and synchronize intermediate results.
 
-> ⚠️ **Important:** Over-the-Internet distributed training/inference is usually limited by network latency and throughput.  
-> This architecture is best for experimentation and learning, not for peak performance compared with local high-bandwidth interconnects.
-
 ---
 
 ## High-Level Architecture
@@ -252,3 +249,5 @@ For final academic/professional submission, prefer:
 - [x] Add reproducible run command examples (`docs/run_commands.md`)
 - [x] Add failure-handling and retry strategy in orchestration (`run_cluster.sh`)
 - [x] Add a concise README version of this architecture (`README.md`)
+
+mgreen@mykol.com

@@ -2,13 +2,10 @@
 
 An experimental over-the-Internet distributed compute cluster that coordinates multiple devices (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
 
-> ⚠️ This project is designed for **experimentation and learning**. Over-the-Internet links introduce latency overhead that limits linear speedup — see [Known Constraints](#known-constraints).
-
 ---
 
 ## Architecture
 
-<<<<<<< HEAD
 ```mermaid
 graph TB
     subgraph OL["Orchestration Layer"]
@@ -179,3 +176,5 @@ NOTES.md                     # Extended architecture notes and context
 | [`NOTES.md`](NOTES.md) | Extended architecture notes, slide outline, and source quality notes |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
+
+mgreen@mykol.com
