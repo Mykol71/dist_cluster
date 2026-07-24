@@ -62,11 +62,11 @@ echo "Initializing distributed cluster..."
 
 # 1) Start worker rank 1
 ssh mobile@"$IPHONE_A_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # run in background
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # keep worker launches concurrent
 
 # 2) Start worker rank 2
 ssh mobile@"$IPHONE_B_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # run in background
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # keep worker launches concurrent
 
 # 3) Start rank 0 on master
 echo "Launching master process..."
