@@ -14,7 +14,7 @@ Instead of transferring raw VRAM contents across devices, the practical approach
 ## High-Level Architecture
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph OL["Orchestration Layer"]
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
