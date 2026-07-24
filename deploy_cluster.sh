@@ -27,7 +27,7 @@ fi
 
 case "$(get_remote_os "$node")" in
 Darwin)
-ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" 'printf "%s\n" "$HOME/dist_cluster"' 2>/dev/null
+ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" "printf '%s\n' \"\$HOME/$DEFAULT_DARWIN_REMOTE_PROJECT_DIR\"" 2>/dev/null
 ;;
 *)
 printf '%s\n' "$DEFAULT_LINUX_REMOTE_PROJECT_DIR"
@@ -102,7 +102,7 @@ fi
 
 # 3. PIP Dependency Check Loop
 echo "🐍 [$node] Verifying Python library dependencies..."
-for pkg in "${REQUIRED_PIP_PACKAGES[@]}" do
+for pkg in "${REQUIRED_PIP_PACKAGES[@]}"; do
 if ! ssh "$node" "python3 -c 'import $pkg'" > /dev/null 2>&1; then
 echo "📥 [$node] Installing missing package: $pkg..."
 if [ "$remote_os" = "Darwin" ]; then

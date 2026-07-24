@@ -112,7 +112,7 @@ get_remote_project_dir() {
 
   case "$(get_remote_os "$node")" in
     Darwin)
-      ssh -q -o ConnectTimeout=$SSH_HEALTH_TIMEOUT -o BatchMode=yes "$node" 'printf "%s\n" "$HOME/dist_cluster"' 2>/dev/null
+      ssh -q -o ConnectTimeout=$SSH_HEALTH_TIMEOUT -o BatchMode=yes "$node" "printf '%s\n' \"\$HOME/$DEFAULT_DARWIN_REMOTE_PROJECT_DIR\"" 2>/dev/null
       ;;
     *)
       printf '%s\n' "$DEFAULT_LINUX_REMOTE_PROJECT_DIR"

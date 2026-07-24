@@ -58,7 +58,7 @@ Run once per session (or after a factory reset / fresh iSH install):
 bash deploy_cluster.sh
 ```
 
-Expected output: `✅ [iphoneA] Fully deployed and ready...` for each node.
+Expected output: `✅ [workerA] Fully deployed and ready...` for each node.
 
 `deploy_cluster.sh` defaults to `/app` on Linux/iPhone workers and `~/dist_cluster` on macOS workers. Export `REMOTE_PROJECT_DIR` first if you want every worker to use a custom path.
 
@@ -84,13 +84,15 @@ The script will:
 Run a minimal distributed smoke test (simple `all_sum`) to verify comms before heavy workloads:
 
 ```bash
-ssh workerA "cd /app && \
-  MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=1 \
-  python3 src/train_dist.py" &
+REMOTE_DIR="/app" # use "~/dist_cluster" on macOS workers unless you exported REMOTE_PROJECT_DIR
 
-ssh workerB "cd /app && \
+ssh workerA "cd $REMOTE_DIR && \
+  MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=1 \
+  python3 train_dist.py" &
+
+ssh workerB "cd $REMOTE_DIR && \
   MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=2 \
-  python3 src/train_dist.py" &
+  python3 train_dist.py" &
 
 MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=0 \
   python3 src/train_dist.py
