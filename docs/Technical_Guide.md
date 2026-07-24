@@ -1,6 +1,6 @@
 # Technical Guide - Distributed Cluster
 
-This guide expands on the project overview from `index.html` and presents the same architecture, workflow, and diagram style in a documentation-focused format.
+This guide expands on the main project landing page and presents the same architecture, workflow, and diagram style in a documentation-focused format.
 
 ---
 
