@@ -174,6 +174,7 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
 | [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
 | [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX |
+| [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine Tailscale setup |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
 
