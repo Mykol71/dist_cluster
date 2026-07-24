@@ -23,7 +23,7 @@ graph TB
     VPN <-->|"Private VPN IP"| W2
 ```
 
-slide 4: Adaptive Optimization (The Key Innovation)
+Adaptive Optimization (The Key Innovation)
 --
 - The Network Bottleneck: Internet routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.
 - Dynamic Packet Tuning: An automated network ping test executes right before data distribution.
@@ -43,7 +43,7 @@ flowchart LR
     AGG --> DONE([✅ Result])
 ```
 
-slide 5: Technical Execution Workflow
+Technical Execution Workflow
 --
 - Deployment: deploy_cluster.sh uses parallel background tasks to sync code, detect operating systems (iSH Alpine vs Native iOS), and configure dependencies automatically.
 - Profiling: run_cluster.sh benchmarks connection latencies and starts remote background worker ranks over SSH.
@@ -82,7 +82,7 @@ sequenceDiagram
     M->>M: generate_report.py → cluster_performance.csv
 ```
 
-slide 6: Key Findings & Performance Scaling
+Key Findings & Performance Scaling
 --
 - Compute vs. Network Cost: iPhone hardware handles local matrix multiplication instantly, but internet bandwidth limits linear speedup scaling.
 - Amdahl's Law in Action: The project illustrates how a slower communication layer introduces parallel overhead, demonstrating real-world high-performance computing (HPC) constraints.
