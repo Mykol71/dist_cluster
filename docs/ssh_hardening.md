@@ -200,3 +200,5 @@ cp /var/log/auth.log /var/log/auth.log.$(date +%Y%m%d)
 - [ ] `fail2ban` or `iptables` rate limiting configured
 - [ ] Firewall rules allow SSH only from VPN subnet
 - [ ] `LogLevel VERBOSE` enabled; logs reviewed after each session
+
+mgreen@mykol.com

@@ -153,3 +153,5 @@ cat FINAL_PROJECT_SUMMARY.md
 | Worker exits immediately             | Python dependency missing     | Re-run `bash deploy_cluster.sh`             |
 | High latency / stall during run      | Poor network conditions       | Check `docs/latency_benchmark_samples.md` decision table |
 | `FINAL_PROJECT_SUMMARY.md` empty     | `cluster_performance.csv` missing | Ensure `log_metrics.py` ran successfully |
+
+mgreen@mykol.com
