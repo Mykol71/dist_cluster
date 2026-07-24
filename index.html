@@ -3,14 +3,285 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dist Cluster</title>
+  <title>Distributed Compute Cluster</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+      color: #24292f;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    h1 { font-size: 2rem; border-bottom: 2px solid #d0d7de; padding-bottom: 0.4rem; margin-top: 2rem; }
+    h2 { font-size: 1.5rem; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+
+    p { margin: 0.75rem 0; }
+
+    a { color: #0969da; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.875em;
+      padding: 0.15em 0.4em;
+    }
+
+    pre {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    ul, ol { padding-left: 1.5rem; margin: 0.75rem 0; }
+    li { margin: 0.35rem 0; }
+
+    hr { border: none; border-top: 1px solid #d0d7de; margin: 2rem 0; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      border: 1px solid #d0d7de;
+      padding: 0.55rem 0.9rem;
+      text-align: left;
+    }
+
+    th { background: #f6f8fa; font-weight: 600; }
+    tr:nth-child(even) td { background: #f6f8fa; }
+
+    .mermaid {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin: 1.25rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    footer {
+      margin-top: 3rem;
+      color: #57606a;
+      font-size: 0.875rem;
+    }
+  </style>
 </head>
 <body>
-  <h1>Dist Cluster</h1>
-  <p>Distributed compute cluster experiment.</p>
-  <p>
-    Source:
-    <a href="https://github.com/Mykol71/dist_cluster">Mykol71/dist_cluster</a>
-  </p>
+  <div class="container">
+
+    <h1>Distributed Compute Cluster</h1>
+
+    <p>
+      An experimental over-the-Internet distributed compute cluster that coordinates multiple devices
+      (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes,
+      processed in parallel, and results are synchronized using Python-based collective operations.
+    </p>
+
+    <hr />
+
+    <h2>Architecture</h2>
+
+    <div class="mermaid">
+graph TB
+    subgraph OL["Orchestration Layer"]
+        ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
+    end
+    subgraph NL["Network Layer"]
+        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+    end
+    subgraph CL["Compute Layer"]
+        W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
+        W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
+    end
+    ORCH <-->|"SSH + Matrix Chunks"| VPN
+    VPN <-->|"Private VPN IP"| W1
+    VPN <-->|"Private VPN IP"| W2
+    </div>
+
+    <h2>Adaptive Optimization (The Key Innovation)</h2>
+
+    <ul>
+      <li><strong>The Network Bottleneck:</strong> Internet routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.</li>
+      <li><strong>Dynamic Packet Tuning:</strong> An automated network ping test executes right before data distribution.</li>
+      <li><strong>Low Latency (Wi-Fi):</strong> Drops down to responsive 256&nbsp;KB packet chunks.</li>
+      <li><strong>High Latency (Cellular/LTE):</strong> Automatically scales to large 2&nbsp;MB streaming data blocks to maximize throughput.</li>
+    </ul>
+
+    <div class="mermaid">
+flowchart LR
+    START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
+    PING --> CHECK{Latency?}
+    CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
+    CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+    SMALL --> DIST["Distribute work\nto worker ranks"]
+    LARGE --> DIST
+    DIST --> COMPUTE["Workers compute\ndot-product loops"]
+    COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+    AGG --> DONE([✅ Result])
+    </div>
+
+    <h2>Technical Execution Workflow</h2>
+
+    <ul>
+      <li><strong>Deployment:</strong> <code>deploy_cluster.sh</code> uses parallel background tasks to sync code, detect operating systems (iSH Alpine vs Native iOS), and configure dependencies automatically.</li>
+      <li><strong>Profiling:</strong> <code>run_cluster.sh</code> benchmarks connection latencies and starts remote background worker ranks over SSH.</li>
+      <li><strong>Calculation:</strong> Workers stream data chunks, process heavy dot-product row loops inside their hardware memory pools, and return calculations.</li>
+      <li><strong>Verification:</strong> The master node aggregates chunks, renders progress bars, saves a final unified <code>.csv</code> report, and engages mathematical delta checkers.</li>
+    </ul>
+
+    <div class="mermaid">
+sequenceDiagram
+    participant M as 🖥️ Master Node
+    participant A as 📱 iPhone A (Rank 1)
+    participant B as 📱 iPhone B (Rank 2)
+
+    Note over M,B: Phase 1 — Deploy
+    M->>A: deploy_cluster.sh: sync src/, install deps
+    M->>B: deploy_cluster.sh: sync src/, install deps
+    A-->>M: ✅ environment ready
+    B-->>M: ✅ environment ready
+
+    Note over M,B: Phase 2 — Profile
+    M->>A: ping_test.py (latency probe)
+    M->>B: ping_test.py (latency probe)
+    A-->>M: latency / buffer size
+    B-->>M: latency / buffer size
+    M->>M: set OPTIMAL_BUFFER
+
+    Note over M,B: Phase 3 — Compute
+    M->>A: SSH: start worker rank 1
+    M->>B: SSH: start worker rank 2
+    M->>M: launch rank 0 locally
+    A-->>M: matrix chunk result
+    B-->>M: matrix chunk result
+
+    Note over M,B: Phase 4 — Verify & Report
+    M->>M: verify_output.py (delta check)
+    M->>M: log_metrics.py (telemetry)
+    M->>M: generate_report.py → cluster_performance.csv
+    </div>
+
+    <h2>Key Findings &amp; Performance Scaling</h2>
+
+    <ul>
+      <li><strong>Compute vs. Network Cost:</strong> iPhone hardware handles local matrix multiplication instantly, but internet bandwidth limits linear speedup scaling.</li>
+      <li><strong>Amdahl's Law in Action:</strong> The project illustrates how a slower communication layer introduces parallel overhead, demonstrating real-world high-performance computing (HPC) constraints.</li>
+    </ul>
+
+    <hr />
+
+    <h2>Quick Start</h2>
+
+    <h3>Prerequisites</h3>
+    <ul>
+      <li>Tailscale or WireGuard installed and connected on all devices.</li>
+      <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a>).</li>
+      <li>Python 3 + <code>numpy</code> (and optionally <code>mlx</code>) on all nodes.</li>
+      <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
+    </ul>
+
+    <h3>1. Deploy dependencies to worker nodes</h3>
+    <pre><code>bash deploy_cluster.sh</code></pre>
+
+    <h3>2. Run the cluster</h3>
+    <pre><code>bash run_cluster.sh</code></pre>
+
+    <h3>3. View the report</h3>
+    <pre><code>cat FINAL_PROJECT_SUMMARY.md</code></pre>
+
+    <p>For detailed step-by-step commands including smoke tests and troubleshooting, see <a href="docs/run_commands.md">docs/run_commands.md</a>.</p>
+
+    <hr />
+
+    <h2>File Structure</h2>
+
+    <pre><code>deploy_cluster.sh            # Node provisioning: connectivity, packages, file sync
+run_cluster.sh               # Orchestration: latency profile, spawn workers, cleanup
+verify_output.py             # Numerical correctness checks
+log_metrics.py               # Telemetry logging and CSV output
+generate_report.py           # Final Markdown report generation
+src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
+src/ping_test.py             # Network latency probe (returns buffer recommendation)
+docs/ssh_hardening.md        # SSH security hardening guide
+docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
+docs/run_commands.md         # Reproducible copy-paste run commands
+docs/Technical_Guide.md      # Extended architecture notes and context</code></pre>
+
+    <hr />
+
+    <h2>Known Constraints</h2>
+
+    <table>
+      <thead>
+        <tr><th>Constraint</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Network bottleneck</strong></td><td>Internet latency is much higher than local interconnects; collective ops become communication-bound quickly.</td></tr>
+        <tr><td><strong>iOS background limits</strong></td><td>iOS may suspend background terminal sessions; keep the screen active during runs.</td></tr>
+        <tr><td><strong>WAN jitter</strong></td><td>Packet loss and jitter cause straggler ranks; the orchestrator retries SSH connections and aborts on persistent failure.</td></tr>
+        <tr><td><strong>Amdahl's Law</strong></td><td>Communication overhead grows with node count; speedup tapers off beyond a small cluster size.</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Documentation</h2>
+
+    <table>
+      <thead>
+        <tr><th>Document</th><th>Contents</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a></td><td>Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging</td></tr>
+        <tr><td><a href="docs/latency_benchmark_samples.md">docs/latency_benchmark_samples.md</a></td><td>Sample ping/CSV output and scaling decision table</td></tr>
+        <tr><td><a href="docs/run_commands.md">docs/run_commands.md</a></td><td>Step-by-step reproducible commands for the full workflow</td></tr>
+        <tr><td><a href="docs/Technical_Guide.md">docs/Technical_Guide.md</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      By default, Linux/iPhone-style workers deploy into <code>/app</code>, while macOS workers deploy into
+      <code>~/dist_cluster</code>. Set <code>REMOTE_PROJECT_DIR</code> before running the scripts to override
+      that path for every worker.
+    </p>
+
+    <footer>
+      <a href="mailto:mgreen@mykol.com">mgreen@mykol.com</a>
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+  </script>
 </body>
 </html>
