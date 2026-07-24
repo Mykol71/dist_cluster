@@ -22,8 +22,11 @@ REMOTE_PROJECT_DIR="/app"
 SCRIPT_NAME="train_dist.py"
 
 # Retry settings for SSH worker launch
-SSH_MAX_RETRIES=3      # maximum attempts per node
-SSH_RETRY_DELAY=5      # seconds between attempts (doubles on each retry)
+SSH_MAX_RETRIES=3        # maximum attempts per node
+SSH_RETRY_DELAY=5        # seconds between attempts (doubles on each retry)
+SSH_CONNECT_TIMEOUT=10   # seconds to wait for a worker SSH connection to succeed
+SSH_HEALTH_TIMEOUT=5     # shorter timeout for health-check probes (quick pass/fail)
+WORKER_BIND_DELAY=2      # seconds to wait after spawning workers so they can bind ports
 
 # ─── GLOBALS ────────────────────────────────────────────────────────────────
 
@@ -61,7 +64,7 @@ ssh_with_retry() {
   local delay=$SSH_RETRY_DELAY
 
   while [ $attempt -le $SSH_MAX_RETRIES ]; do
-    if ssh -o ConnectTimeout=10 -o BatchMode=yes "$node" "$remote_cmd"; then
+    if ssh -o ConnectTimeout=$SSH_CONNECT_TIMEOUT -o BatchMode=yes "$node" "$remote_cmd"; then
       return 0
     fi
     echo "⚠️  [$node] SSH attempt $attempt/$SSH_MAX_RETRIES failed. Retrying in ${delay}s..." >&2
@@ -81,7 +84,7 @@ node_health_check() {
   echo "🔍 [$node] Running pre-flight health check..."
 
   # Basic reachability
-  if ! ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" exit 2>/dev/null; then
+  if ! ssh -q -o ConnectTimeout=$SSH_HEALTH_TIMEOUT -o BatchMode=yes "$node" exit 2>/dev/null; then
     echo "❌ [$node] Unreachable over SSH." >&2
     return 1
   fi
@@ -157,7 +160,7 @@ for node in "${IPHONE_NODES[@]}"; do
 done
 
 # Brief window for workers to bind and listen
-sleep 2
+sleep "$WORKER_BIND_DELAY"
 
 # ── 4. LAUNCH LOCAL MASTER (RANK 0) ─────────────────────────────────────────
 
