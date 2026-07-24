@@ -14,11 +14,12 @@ set -euo pipefail
 
 # ─── CONFIGURATION ──────────────────────────────────────────────────────────
 
-IPHONE_NODES=("iphoneA" "iphoneB")
-MASTER_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}' || hostname -I | awk '{print $1}')
+WORKER_NODES=("iphoneA" "iphoneB")
 MASTER_PORT=8080
-WORLD_SIZE=$(( ${#IPHONE_NODES[@]} + 1 ))
-REMOTE_PROJECT_DIR="/app"
+WORLD_SIZE=$(( ${#WORKER_NODES[@]} + 1 ))
+LOCAL_PROJECT_DIR="./src"
+DEFAULT_LINUX_REMOTE_PROJECT_DIR="/app"
+DEFAULT_DARWIN_REMOTE_PROJECT_DIR="dist_cluster"
 SCRIPT_NAME="train_dist.py"
 
 # Retry settings for SSH worker launch
@@ -77,10 +78,53 @@ ssh_with_retry() {
   return 1
 }
 
+detect_master_ip() {
+  if command -v ip >/dev/null 2>&1; then
+    ip route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}'
+    return 0
+  fi
+
+  if command -v route >/dev/null 2>&1 && command -v ipconfig >/dev/null 2>&1; then
+    local default_interface
+    default_interface=$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')
+    if [ -n "$default_interface" ]; then
+      ipconfig getifaddr "$default_interface" 2>/dev/null
+      return 0
+    fi
+  fi
+
+  if command -v hostname >/dev/null 2>&1; then
+    hostname -I 2>/dev/null | awk '{print $1}'
+  fi
+}
+
+get_remote_os() {
+  local node="$1"
+  ssh -q -o ConnectTimeout=$SSH_HEALTH_TIMEOUT -o BatchMode=yes "$node" "uname -s" 2>/dev/null || true
+}
+
+get_remote_project_dir() {
+  local node="$1"
+  if [ -n "${REMOTE_PROJECT_DIR:-}" ]; then
+    printf '%s\n' "$REMOTE_PROJECT_DIR"
+    return 0
+  fi
+
+  case "$(get_remote_os "$node")" in
+    Darwin)
+      ssh -q -o ConnectTimeout=$SSH_HEALTH_TIMEOUT -o BatchMode=yes "$node" 'printf "%s\n" "$HOME/dist_cluster"' 2>/dev/null
+      ;;
+    *)
+      printf '%s\n' "$DEFAULT_LINUX_REMOTE_PROJECT_DIR"
+      ;;
+  esac
+}
+
 # node_health_check <node>
 #   Verifies the node is reachable and the project directory/script exist.
 node_health_check() {
   local node="$1"
+  local remote_project_dir
   echo "🔍 [$node] Running pre-flight health check..."
 
   # Basic reachability
@@ -89,9 +133,15 @@ node_health_check() {
     return 1
   fi
 
+  remote_project_dir=$(get_remote_project_dir "$node")
+  if [ -z "$remote_project_dir" ]; then
+    echo "❌ [$node] Could not determine the remote project directory." >&2
+    return 1
+  fi
+
   # Verify the worker script is deployed
-  if ! ssh -q -o BatchMode=yes "$node" "test -f $REMOTE_PROJECT_DIR/$SCRIPT_NAME" 2>/dev/null; then
-    echo "❌ [$node] Worker script not found at $REMOTE_PROJECT_DIR/$SCRIPT_NAME." >&2
+  if ! ssh -q -o BatchMode=yes "$node" "test -f \"$remote_project_dir/$SCRIPT_NAME\"" 2>/dev/null; then
+    echo "❌ [$node] Worker script not found at $remote_project_dir/$SCRIPT_NAME." >&2
     echo "   Run 'bash deploy_cluster.sh' to deploy." >&2
     return 1
   fi
@@ -105,6 +155,11 @@ node_health_check() {
 echo "=================================================="
 echo "🌀 Launching Distributed GPU/VRAM Processing Pool"
 echo "=================================================="
+MASTER_IP=${MASTER_IP:-$(detect_master_ip)}
+if [ -z "$MASTER_IP" ]; then
+  echo "❌ Could not determine the master node IP. Set MASTER_IP explicitly." >&2
+  exit 1
+fi
 echo "🌐 Master Node IP: $MASTER_IP | Port: $MASTER_PORT"
 echo "🖥️  Total Nodes in World: $WORLD_SIZE"
 echo "--------------------------------------------------"
@@ -114,7 +169,7 @@ echo "--------------------------------------------------"
 echo "📡 Measuring network latency across internet VPN..."
 OPTIMAL_BUFFER=1048576  # default fallback (1 MB)
 
-for node in "${IPHONE_NODES[@]}"; do
+for node in "${WORKER_NODES[@]}"; do
   # ping_test.py returns the recommended buffer size in bytes
   detected_buffer=$(python3 ./src/ping_test.py "$node" 2>/dev/null || echo "$OPTIMAL_BUFFER")
   if [ "$detected_buffer" -gt "$OPTIMAL_BUFFER" ] 2>/dev/null; then
@@ -128,7 +183,7 @@ echo "--------------------------------------------------"
 # ── 2. PER-NODE HEALTH CHECKS ───────────────────────────────────────────────
 
 echo "🩺 Pre-flight checks on all worker nodes..."
-for node in "${IPHONE_NODES[@]}"; do
+for node in "${WORKER_NODES[@]}"; do
   if ! node_health_check "$node"; then
     echo "❌ Pre-flight failed for node '$node'. Aborting." >&2
     exit 1
@@ -139,14 +194,20 @@ echo "--------------------------------------------------"
 # ── 3. SPAWN REMOTE WORKER RANKS ────────────────────────────────────────────
 
 RANK=1
-for node in "${IPHONE_NODES[@]}"; do
+for node in "${WORKER_NODES[@]}"; do
+  remote_project_dir=$(get_remote_project_dir "$node")
+  if [ -z "$remote_project_dir" ]; then
+    echo "❌ [$node] Could not determine the remote project directory." >&2
+    exit 1
+  fi
+
   echo "📡 [RANK $RANK] Starting worker on $node..."
 
   # Launch the remote worker with retry, in the background.
   # The subshell calls ssh_with_retry so we can capture its PID.
   (
     ssh_with_retry "$node" \
-      "cd $REMOTE_PROJECT_DIR && \
+      "cd \"$remote_project_dir\" && \
        MASTER_ADDR=$MASTER_IP \
        MASTER_PORT=$MASTER_PORT \
        WORLD_SIZE=$WORLD_SIZE \
@@ -173,7 +234,7 @@ MASTER_PORT=$MASTER_PORT \
 WORLD_SIZE=$WORLD_SIZE \
 RANK=0 \
 BUFFER_SIZE=$OPTIMAL_BUFFER \
-python3 "$REMOTE_PROJECT_DIR/$SCRIPT_NAME"
+python3 "$LOCAL_PROJECT_DIR/$SCRIPT_NAME"
 
 # ── 5. WAIT FOR ALL WORKERS ──────────────────────────────────────────────────
 

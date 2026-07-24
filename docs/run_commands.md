@@ -11,20 +11,20 @@ your actual Tailscale/WireGuard addresses.
 | Variable       | Example value       | Description                          |
 |----------------|---------------------|--------------------------------------|
 | `MASTER_IP`    | `100.11.22.33`      | VPN IP of the orchestrator machine   |
-| `IPHONE_A_IP`  | `100.11.22.44`      | VPN IP of worker node A (iphoneA)    |
-| `IPHONE_B_IP`  | `100.11.22.55`      | VPN IP of worker node B (iphoneB)    |
-| `SSH_USER`     | `mobile`            | Non-root SSH user on worker nodes    |
-| `REMOTE_DIR`   | `/app`              | Working directory on worker nodes    |
+| `WORKER_A_IP`  | `100.11.22.44`      | VPN IP of worker node A (`workerA`)  |
+| `WORKER_B_IP`  | `100.11.22.55`      | VPN IP of worker node B (`workerB`)  |
+| `SSH_USER`     | `mobile`            | SSH user on worker nodes             |
+| `REMOTE_DIR`   | `/app` or `~/dist_cluster` | Working directory on worker nodes |
 
 Add the worker aliases to `~/.ssh/config` on the orchestrator for convenience:
 
 ```
-Host iphoneA
+Host workerA
     HostName 100.11.22.44
     User mobile
     IdentityFile ~/.ssh/dist_cluster_id
 
-Host iphoneB
+Host workerB
     HostName 100.11.22.55
     User mobile
     IdentityFile ~/.ssh/dist_cluster_id
@@ -38,12 +38,12 @@ Before any run, confirm every node is reachable over the VPN:
 
 ```bash
 # Ping check
-ping -c 4 100.11.22.44   # iphoneA
-ping -c 4 100.11.22.55   # iphoneB
+ping -c 4 100.11.22.44   # workerA
+ping -c 4 100.11.22.55   # workerB
 
 # SSH check
-ssh iphoneA echo "iphoneA reachable"
-ssh iphoneB echo "iphoneB reachable"
+ssh workerA echo "workerA reachable"
+ssh workerB echo "workerB reachable"
 ```
 
 Expected output: four successful ping replies and the echo strings printed without errors.
@@ -59,6 +59,8 @@ bash deploy_cluster.sh
 ```
 
 Expected output: `✅ [iphoneA] Fully deployed and ready...` for each node.
+
+`deploy_cluster.sh` defaults to `/app` on Linux/iPhone workers and `~/dist_cluster` on macOS workers. Export `REMOTE_PROJECT_DIR` first if you want every worker to use a custom path.
 
 ---
 
@@ -82,11 +84,11 @@ The script will:
 Run a minimal distributed smoke test (simple `all_sum`) to verify comms before heavy workloads:
 
 ```bash
-ssh iphoneA "cd /app && \
+ssh workerA "cd /app && \
   MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=1 \
   python3 src/train_dist.py" &
 
-ssh iphoneB "cd /app && \
+ssh workerB "cd /app && \
   MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=2 \
   python3 src/train_dist.py" &
 
@@ -126,7 +128,7 @@ Telemetry CSV: `cluster_performance.csv`
 ```bash
 # 1. Connectivity checks
 ping -c 4 100.11.22.44 && ping -c 4 100.11.22.55
-ssh iphoneA echo "OK" && ssh iphoneB echo "OK"
+ssh workerA echo "OK" && ssh workerB echo "OK"
 
 # 2. Deploy
 bash deploy_cluster.sh
