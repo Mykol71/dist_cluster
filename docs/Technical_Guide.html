@@ -52,15 +52,13 @@
 <h2>High-Level Architecture</h2>
 
 <pre><code class="language-text">
-graph TD
-    MASTER["🖥️ Master Node\n(Bash Orchestrator)\nrun_cluster.sh / deploy_cluster.sh"]
-    VPN["🔒 Secure VPN Tunnel\nTailscale / WireGuard\n(Encrypted P2P)"]
-    A["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA\nsrc/train_dist.py"]
-    B["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA\nsrc/train_dist.py"]
-
-    MASTER &lt;-->|"SSH + data chunks"| VPN
-    VPN &lt;-->|"Static private VPN IP"| A
-    VPN &lt;-->|"Static private VPN IP"| B
+[Master Node: run_cluster.sh / deploy_cluster.sh]
+        │
+        │ SSH + data chunks over encrypted VPN
+        ▼
+[Secure VPN Tunnel: Tailscale or WireGuard]
+        ├── [iPhone A: Worker Rank 1]
+        └── [iPhone B: Worker Rank 2]
 </code></pre>
 
 <hr />
@@ -143,18 +141,12 @@ print(f"Rank {rank} synchronized data: {sum_x}")
 <h3>Matrix Data-Flow Diagram</h3>
 
 <pre><code class="language-text">
-flowchart LR
-    MAT["📐 Large Matrix\nWorkload"] --> SPLIT["Master: split\ninto row chunks"]
-    SPLIT --> R0["Chunk → Rank 0"]
-    SPLIT --> R1["Chunk → Rank 1"]
-    SPLIT --> R2["Chunk → Rank 2"]
-    R0 --> M["🖥️ Master Node\nlocal dot-product"]
-    R1 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
-    R2 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
-    M --> AGG["all_sum collective\n(aggregate results)"]
-    W1 --> AGG
-    W2 --> AGG
-    AGG --> OUT["✅ Final Result\n+ cluster_performance.csv"]
+Large matrix workload
+  1) Master splits rows into chunks
+  2) Chunks are sent to Rank 0, Rank 1, and Rank 2
+  3) Each rank computes local dot-product loops
+  4) all_sum collective aggregates partial outputs
+  5) Final result and cluster_performance.csv are produced
 </code></pre>
 
 <hr />
@@ -181,12 +173,12 @@ flowchart LR
 <h2>Suggested Validation Workflow</h2>
 
 <pre><code class="language-text">
-flowchart TD
-    S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
-    S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
-    S3 --> S4["4️⃣ Run all_sum smoke test\n(small distributed round-trip)"]
-    S4 --> S5["5️⃣ Scale workload gradually"]
-    S5 --> LOG["📊 Log metrics\nnetwork time · compute time · wall-clock time"]
+1) Validate VPN connectivity for all nodes
+2) Validate SSH connectivity and remote command execution
+3) Run latency/bandwidth probe script (ping_test.py)
+4) Run a small all_sum distributed smoke test
+5) Scale workload gradually
+6) Log network time, compute time, and wall-clock metrics
 </code></pre>
 
 <hr />
