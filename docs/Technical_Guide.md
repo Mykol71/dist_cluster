@@ -1,43 +1,50 @@
-# Distributed Network Cluster Notes
+# Technical Guide - Distributed Cluster
+
+This guide expands on the main project landing page and presents the same architecture, workflow, and diagram style in a documentation-focused format.
+
+---
 
 ## Overview
 
-This document describes a distributed compute experiment that coordinates multiple devices over a secure network.  
-Instead of transferring raw VRAM contents across devices, the practical pattern is to split model/workload state across nodes (for example, tensor/model/data parallel strategies) and synchronize intermediate results.
+This distributed compute experiment coordinates multiple devices over a secure network.
+Instead of transferring raw VRAM contents across devices, the practical approach is to split model or workload state across nodes and synchronize intermediate results.
 
 ---
 
 ## High-Level Architecture
 
 ```mermaid
-graph TD
-    MASTER["🖥️ Master Node\n(Bash Orchestrator)\nrun_cluster.sh / deploy_cluster.sh"]
-    VPN["🔒 Secure VPN Tunnel\nTailscale / WireGuard\n(Encrypted P2P)"]
-    A["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA\nsrc/train_dist.py"]
-    B["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA\nsrc/train_dist.py"]
-
-    MASTER <-->|"SSH + data chunks"| VPN
-    VPN <-->|"Static private VPN IP"| A
-    VPN <-->|"Static private VPN IP"| B
+flowchart TD
+    subgraph OL["Orchestration Layer"]
+        ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
+    end
+    subgraph NL["Network Layer"]
+        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+    end
+    subgraph CL["Compute Layer"]
+        W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
+        W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
+    end
+    ORCH <-->|"SSH + Matrix Chunks"| VPN
+    VPN <-->|"Private VPN IP"| W1
+    VPN <-->|"Private VPN IP"| W2
 ```
 
 ---
 
-## Step 1 — Establish a Secure Network Tunnel
+## Step 1 - Establish a Secure Network Tunnel
 
 All nodes must be reachable on a common private network.
 
-- Install a secure mesh VPN (e.g., Tailscale or WireGuard) on:
-  - the orchestrator machine
-  - each worker device
+- Install a secure mesh VPN such as Tailscale or WireGuard on the orchestrator and each worker device.
 - Verify each node has a stable private VPN IP.
-- Validate connectivity (`ping`, then `ssh`) before starting distributed jobs.
+- Validate connectivity with `ping` and `ssh` before starting distributed jobs.
 
 ---
 
-## Step 2 — Bash Orchestrator (Master Control)
+## Step 2 - Bash Orchestrator (Master Control)
 
-The host script starts worker processes remotely via SSH and launches rank 0 locally.
+The host script starts worker processes remotely over SSH and launches rank 0 locally.
 
 ```bash
 #!/usr/bin/env bash
@@ -55,11 +62,11 @@ echo "Initializing distributed cluster..."
 
 # 1) Start worker rank 1
 ssh mobile@"$IPHONE_A_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # keep worker launches concurrent
 
 # 2) Start worker rank 2
 ssh mobile@"$IPHONE_B_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # keep worker launches concurrent
 
 # 3) Start rank 0 on master
 echo "Launching master process..."
@@ -71,19 +78,18 @@ echo "Distributed processing finished."
 
 ### SSH Notes
 
-- Use key-based auth only (disable password auth where possible).
-- Restrict SSH exposure to VPN interface.
+- Use key-based authentication only.
+- Restrict SSH exposure to the VPN interface.
 - Prefer non-root users with minimal privileges.
 
 ---
 
-## Step 3 — Worker Script (`train_dist.py`)
+## Step 3 - Worker Script (`train_dist.py`)
 
 Each process initializes distributed communication and runs synchronized operations.
 
 ```python
 import mlx.core as mx
-import mlx.nn as nn  # kept for future model components
 
 mx.distributed.init()
 
@@ -123,16 +129,16 @@ flowchart LR
 ### 1) Network Bottleneck
 
 - Device-local memory bandwidth is much higher than Internet links.
-- Collective operations (`all_sum`, etc.) can become communication-bound quickly.
+- Collective operations such as `all_sum` can become communication-bound quickly.
 
 ### 2) iOS Background Execution Limits
 
-- iOS may suspend or terminate long-running/background terminal processes.
+- iOS may suspend or terminate long-running background terminal processes.
 - Keep apps active and device power settings in mind during experiments.
 
 ### 3) Reliability
 
-- WAN jitter/packet loss causes stragglers and unstable step time.
+- WAN jitter and packet loss can create stragglers and unstable step times.
 - Add retries, health checks, and timeout handling in orchestration scripts.
 
 ---
@@ -150,51 +156,51 @@ flowchart TD
 
 ---
 
-## Presentation Outline (Submission-Friendly)
+## Presentation Outline
 
-### Slide 1 — Title
+### Slide 1 - Title
 
-**Over-the-Internet Distributed Compute Cluster**  
-Using Bash orchestration + secure VPN + Python distributed workers.
+**Over-the-Internet Distributed Compute Cluster**
+Using Bash orchestration, a secure VPN mesh, and Python distributed workers.
 
-### Slide 2 — Problem
+### Slide 2 - Problem
 
-Single-device memory/compute limits for large matrix/model workloads.
+Single-device memory and compute limits for larger matrix or model workloads.
 
-### Slide 3 — Architecture
+### Slide 3 - Architecture
 
-Master orchestrator, VPN mesh, remote worker ranks, synchronized collectives.
+Master orchestrator, VPN mesh, remote worker ranks, and synchronized collectives.
 
-### Slide 4 — Optimization Idea
+### Slide 4 - Optimization Idea
 
-Adaptive chunk sizing / communication strategy based on measured latency.
+Adaptive chunk sizing and communication strategy based on measured latency.
 
-### Slide 5 — Execution Flow
+### Slide 5 - Execution Flow
 
 Deploy → profile network → launch ranks → compute → verify → report.
 
-### Slide 6 — Results and Trade-offs
+### Slide 6 - Results and Trade-offs
 
-Speedup vs communication overhead, with Amdahl's Law interpretation.
+Speedup versus communication overhead, with an Amdahl's Law interpretation.
 
 ---
 
 ## Automated Summary Report Generator (`generate_report.py`)
 
-Use a reporting script to compile telemetry into a final markdown report.
+Use a reporting script to compile telemetry into a final Markdown report.
 
 ### Purpose
 
-- Parse `cluster_performance.csv`
-- Compute speedup metrics
-- Emit `FINAL_PROJECT_SUMMARY.md`
+- Parse `cluster_performance.csv`.
+- Compute speedup metrics.
+- Emit `FINAL_PROJECT_SUMMARY.md`.
 
 ### Recommended Quality Improvements
 
-- Add argument parsing (`argparse`) for log/report paths.
+- Add argument parsing with `argparse` for log and report paths.
 - Validate CSV schema before reading.
 - Handle malformed numeric fields with guarded parsing.
-- Include min/avg/max latency and per-run variance.
+- Include min, avg, and max latency plus per-run variance.
 - Add exit codes for CI usage.
 
 ---
@@ -232,10 +238,10 @@ src/ping_test.py         # network latency evaluation
 
 ## Source Quality Note
 
-The original notes include mixed references (forums, social posts, slide sites, and generated narrative).  
-For final academic/professional submission, prefer:
+The original notes include mixed references such as forums, social posts, slide sites, and generated narrative.
+For final academic or professional submission, prefer:
 
-- official framework docs
+- official framework documentation
 - reproducible benchmarks
 - primary technical references
 - clearly versioned tooling and environment details
@@ -250,4 +256,4 @@ For final academic/professional submission, prefer:
 - [x] Add failure-handling and retry strategy in orchestration (`run_cluster.sh`)
 - [x] Add a concise README version of this architecture (`README.md`)
 
-mgreen@mykol.com
+[mgreen@mykol.com](mailto:mgreen@mykol.com)
