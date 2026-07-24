@@ -150,6 +150,7 @@ cat FINAL_PROJECT_SUMMARY.md
 | Symptom                              | Likely cause                  | Fix                                         |
 |--------------------------------------|-------------------------------|---------------------------------------------|
 | `ssh: connect to host … timed out`   | Private network path unavailable (LAN or VPN) | Verify LAN routing/subnet reachability or re-connect Tailscale/WireGuard on the node |
+| Worker cannot reach rank 0 after startup | Local/VPN path mismatch | Re-run with explicit `MASTER_IP`, confirm worker/host IP family mapping (`192.*`, `10.*`, `172.*`), and set `ALLOW_MASTER_WILDCARD_BIND=1` when mixing LAN-local and VPN-only workers |
 | `Permission denied (publickey)`      | Key not deployed              | Re-run `ssh-copy-id` (see `docs/ssh_hardening.md`) |
 | Worker exits immediately             | Python dependency missing     | Re-run `bash deploy_cluster.sh`             |
 | High latency / stall during run      | Poor network conditions       | Check `docs/latency_benchmark_samples.md` decision table |

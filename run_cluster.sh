@@ -124,14 +124,16 @@ local_network_id() {
 }
 
 get_local_ipv4s() {
+  local raw_ips
   if command -v ip >/dev/null 2>&1; then
-    ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1
+    raw_ips=$(ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 || true)
+    printf '%s\n' "$raw_ips" | grep -E '^[0-9]+\.' | grep -vE '^(127\.|169\.254\.)' || true
     return 0
   fi
 
   if command -v ifconfig >/dev/null 2>&1; then
-    ifconfig 2>/dev/null | awk '
-      /inet / {
+    raw_ips=$(ifconfig 2>/dev/null | awk '
+      /^[[:space:]]*inet / {
         ip=""
         for (i = 1; i <= NF; i++) {
           if ($i == "inet" && (i + 1) <= NF) {
@@ -145,12 +147,14 @@ get_local_ipv4s() {
           print ip
         }
       }
-    ' | grep -v '^127\.' || true
+    ' || true)
+    printf '%s\n' "$raw_ips" | grep -E '^[0-9]+\.' | grep -vE '^(127\.|169\.254\.)' || true
     return 0
   fi
 
   if command -v hostname >/dev/null 2>&1; then
-    (hostname -I 2>/dev/null || hostname -i 2>/dev/null) | tr ' ' '\n' | grep -v '^127\.' || true
+    raw_ips=$( (hostname -I 2>/dev/null || hostname -i 2>/dev/null) | tr ' ' '\n' )
+    printf '%s\n' "$raw_ips" | grep -E '^[0-9]+\.' | grep -vE '^(127\.|169\.254\.)' || true
   fi
 }
 
@@ -381,7 +385,7 @@ if [ "$REQUIRES_MULTI_INTERFACE_BIND" -eq 1 ]; then
   if [ "${ALLOW_MASTER_WILDCARD_BIND:-0}" = "1" ]; then
     MASTER_BIND_IP="0.0.0.0"
     echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
-    echo "⚠️  Ensure host firewall rules allow trusted LAN/VPN worker sources only."
+    echo "⚠️  Ensure firewall rules only allow TCP $MASTER_PORT from trusted LAN/VPN worker sources."
   else
     echo "❌ Mixed LAN/VPN worker routing detected. Set ALLOW_MASTER_WILDCARD_BIND=1 to allow binding rank 0 to 0.0.0.0." >&2
     exit 1
