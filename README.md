@@ -1,79 +1,95 @@
-# dist_cluster
+# Distributed Compute Cluster
 
-`dist_cluster` is an experimental distributed matrix-computing project that coordinates smartphone worker nodes over a secure VPN. It combines Bash-based orchestration with Python compute workers to explore low-cost, internet-routed parallel execution.
+An experimental over-the-Internet distributed compute cluster that coordinates multiple devices (iPhones/mobile nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
 
-## Overview
+> ⚠️ This project is designed for **experimentation and learning**. Over-the-Internet links introduce latency overhead that limits linear speedup — see [Known Constraints](#known-constraints).
 
-The project investigates whether personal mobile devices can be organized into a practical compute cluster for matrix workloads. Rather than positioning this as a replacement for dedicated HPC hardware, the repository focuses on orchestration, networking behavior, and correctness across distributed workers.
+---
 
 ## Architecture
 
-The cluster is organized into three layers:
+```text
+[ Master Node (PC/Mac) ]
+       |
+  VPN Tunnel (Tailscale / WireGuard)
+       |
+  +----+----+
+  |         |
+[iPhone A] [iPhone B]
+(RANK 1)  (RANK 2)
+```
 
-- **Orchestration (Bash):** shell scripts coordinate remote setup, deployment, and worker startup.
-- **Network (VPN):** encrypted connectivity is established via a Tailscale/WireGuard-style mesh.
-- **Compute (Python):** worker processes handle matrix partitions and return partial results to a master node.
+- **Orchestration layer:** Bash scripts manage SSH connections, environment setup, and process lifecycle.
+- **Network layer:** Mesh VPN (Tailscale or WireGuard) provides encrypted peer-to-peer connectivity with stable private IPs.
+- **Compute layer:** Python worker processes exchange split workload chunks and synchronize via `all_sum` collectives.
+- **Adaptive tuning:** Network latency is profiled before each run to set an optimal packet buffer size.
 
-## Adaptive Optimization
+---
 
-Before distributed execution, the workflow profiles network conditions and adjusts transfer behavior. The current scripts include latency-aware buffering logic intended to reduce network overhead under different link conditions.
+## Quick Start
 
-## Execution Workflow
+### Prerequisites
 
-1. **Deploy:** `deploy_cluster.sh` checks node connectivity, prepares remote environments, and syncs project files.
-2. **Profile and run:** `run_cluster.sh` performs latency-oriented prechecks and launches distributed workers.
-3. **Compute:** workers process assigned matrix chunks and send results back to the coordinator.
-4. **Verify/report:** verification and logging scripts are used to check output integrity and capture run metrics.
+- Tailscale or WireGuard installed and connected on all devices.
+- SSH key-based auth configured (see [`docs/ssh_hardening.md`](docs/ssh_hardening.md)).
+- Python 3 + `numpy` (and optionally `mlx`) on all nodes.
 
-## Key Findings
+### 1. Deploy dependencies to worker nodes
 
-- Distributed execution across consumer devices is technically feasible.
-- End-to-end performance is often constrained by network latency and transfer overhead.
-- Communication costs can limit linear scaling even when local computation is fast.
+```bash
+bash deploy_cluster.sh
+```
 
-## Notes and Limitations
+### 2. Run the cluster
 
-- This repository should be read as a prototype/experiment, not a benchmark-validated performance study.
-- Hardware-equivalence claims (for example, smartphone clusters vs. desktop GPUs) should be treated as conceptual unless backed by reproducible measurements from this repo.
-- Results are sensitive to network quality, device heterogeneity, and runtime setup.
+```bash
+bash run_cluster.sh
+```
 
-## Tech Stack
+### 3. View the report
 
-- **Bash** for orchestration and remote automation
-- **Python** for distributed compute, verification, and reporting
-- **SSH** for remote process execution
-- **Tailscale / WireGuard** for secure node connectivity
+```bash
+cat FINAL_PROJECT_SUMMARY.md
+```
 
-## Future Improvements
+For detailed step-by-step commands including smoke tests and troubleshooting, see [`docs/run_commands.md`](docs/run_commands.md).
 
-- Add reproducible benchmark methodology and published result sets
-- Document end-to-end setup and execution steps in more detail
-- Improve fault tolerance/retry handling for unstable nodes
-- Add clearer architecture and data-flow diagrams
+---
 
-## Presentation Outline (for talk/slides)
+## File Structure
 
-### Slide 1 — Title and Overview
-- Over-the-Internet distributed compute cluster concept
-- Smartphone-based worker pool coordinated by Bash and Python
+```
+deploy_cluster.sh            # Node provisioning: connectivity, packages, file sync
+run_cluster.sh               # Orchestration: latency profile, spawn workers, cleanup
+verify_output.py             # Numerical correctness checks
+log_metrics.py               # Telemetry logging and CSV output
+generate_report.py           # Final Markdown report generation
+src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
+src/ping_test.py             # Network latency probe (returns buffer recommendation)
+docs/ssh_hardening.md        # SSH security hardening guide
+docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
+docs/run_commands.md         # Reproducible copy-paste run commands
+NOTES.md                     # Extended architecture notes and context
+```
 
-### Slide 2 — Problem and Constraints
-- Single-device memory and compute limits for larger workloads
-- Need for secure connectivity across geographically distributed nodes
+---
 
-### Slide 3 — System Architecture
-- Orchestration layer (Bash)
-- Secure network layer (VPN)
-- Compute layer (Python workers)
+## Known Constraints
 
-### Slide 4 — Adaptive Optimization
-- Latency variability as a core bottleneck
-- Pre-run network profiling and transfer tuning
+| Constraint | Description |
+|------------|-------------|
+| **Network bottleneck** | Internet latency is much higher than local interconnects; collective ops become communication-bound quickly. |
+| **iOS background limits** | iOS may suspend background terminal sessions; keep the screen active during runs. |
+| **WAN jitter** | Packet loss and jitter cause straggler ranks; the orchestrator retries SSH connections and aborts on persistent failure. |
+| **Amdahl's Law** | Communication overhead grows with node count; speedup tapers off beyond a small cluster size. |
 
-### Slide 5 — Execution Workflow
-- Deploy, profile, run workers, aggregate, verify
+---
 
-### Slide 6 — Findings and Practical Takeaways
-- Feasibility demonstrated
-- Network overhead as the dominant scaling constraint
-- Experimental value in distributed-systems learning
+## Documentation
+
+| Document | Contents |
+|----------|----------|
+| [`docs/ssh_hardening.md`](docs/ssh_hardening.md) | Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging |
+| [`docs/latency_benchmark_samples.md`](docs/latency_benchmark_samples.md) | Sample ping/CSV output and scaling decision table |
+| [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
+| [`NOTES.md`](NOTES.md) | Extended architecture notes, slide outline, and source quality notes |
