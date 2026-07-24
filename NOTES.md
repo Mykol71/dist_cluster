@@ -5,7 +5,7 @@
 This document describes a distributed compute experiment that coordinates multiple devices over a secure network.  
 Instead of transferring raw VRAM contents across devices, the practical pattern is to split model/workload state across nodes (for example, tensor/model/data parallel strategies) and synchronize intermediate results.
 
-> ⚠️ Important: Over-the-Internet distributed training/inference is usually limited by network latency and throughput.  
+> ⚠️ **Important:** Over-the-Internet distributed training/inference is usually limited by network latency and throughput.  
 > This architecture is best for experimentation and learning, not for peak performance compared with local high-bandwidth interconnects.
 
 ---
@@ -107,14 +107,17 @@ print(f"Rank {rank} synchronized data: {sum_x}")
 ## Known Constraints and Risks
 
 ### 1) Network Bottleneck
+
 - Device-local memory bandwidth is much higher than Internet links.
 - Collective operations (`all_sum`, etc.) can become communication-bound quickly.
 
 ### 2) iOS Background Execution Limits
+
 - iOS may suspend or terminate long-running/background terminal processes.
 - Keep apps active and device power settings in mind during experiments.
 
 ### 3) Reliability
+
 - WAN jitter/packet loss causes stragglers and unstable step time.
 - Add retries, health checks, and timeout handling in orchestration scripts.
 
@@ -136,23 +139,29 @@ print(f"Rank {rank} synchronized data: {sum_x}")
 ## Presentation Outline (Submission-Friendly)
 
 ### Slide 1 — Title
+
 **Over-the-Internet Distributed Compute Cluster**  
 Using Bash orchestration + secure VPN + Python distributed workers.
 
 ### Slide 2 — Problem
+
 Single-device memory/compute limits for large matrix/model workloads.
 
 ### Slide 3 — Architecture
+
 Master orchestrator, VPN mesh, remote worker ranks, synchronized collectives.
 
 ### Slide 4 — Optimization Idea
+
 Adaptive chunk sizing / communication strategy based on measured latency.
 
 ### Slide 5 — Execution Flow
+
 Deploy → profile network → launch ranks → compute → verify → report.
 
 ### Slide 6 — Results and Trade-offs
-Speedup vs communication overhead, with Amdahl’s Law interpretation.
+
+Speedup vs communication overhead, with Amdahl's Law interpretation.
 
 ---
 
@@ -161,11 +170,13 @@ Speedup vs communication overhead, with Amdahl’s Law interpretation.
 Use a reporting script to compile telemetry into a final markdown report.
 
 ### Purpose
+
 - Parse `cluster_performance.csv`
 - Compute speedup metrics
 - Emit `FINAL_PROJECT_SUMMARY.md`
 
 ### Recommended Quality Improvements
+
 - Add argument parsing (`argparse`) for log/report paths.
 - Validate CSV schema before reading.
 - Handle malformed numeric fields with guarded parsing.
