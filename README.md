@@ -1,6 +1,6 @@
 # Distributed Compute Cluster
 
-An experimental over-the-Internet distributed compute cluster that coordinates multiple devices (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
+An experimental network distributed compute cluster that coordinates multiple devices (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
 
 ---
 
@@ -25,7 +25,7 @@ graph TB
 
 Adaptive Optimization (The Key Innovation)
 --
-- The Network Bottleneck: Internet routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.
+- The Network Bottleneck: Network routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.
 - Dynamic Packet Tuning: An automated network ping test executes right before data distribution.
 - Low Latency (Wi-Fi): Drops down to responsive 256KB packet chunks.
 - High Latency (Cellular/LTE): Automatically scales to large 2MB streaming data blocks to maximize throughput.
@@ -158,7 +158,7 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 
 | Constraint | Description |
 |------------|-------------|
-| **Network bottleneck** | Internet latency is much higher than local interconnects; collective ops become communication-bound quickly. |
+| **Network bottleneck** | Network latency is much higher than interaction with local VRAM; collective ops become communication-bound quickly. |
 | **iOS background limits** | iOS may suspend background terminal sessions; keep the screen active during runs. |
 | **WAN jitter** | Packet loss and jitter cause straggler ranks; the orchestrator retries SSH connections and aborts on persistent failure. |
 | **Amdahl's Law** | Communication overhead grows with node count; speedup tapers off beyond a small cluster size. |
