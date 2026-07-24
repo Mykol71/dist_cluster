@@ -123,13 +123,13 @@
 
     <hr />
 
-    <h2>Step 1 - Establish a Secure Network Tunnel</h2>
+    <h2>Step 1 - Establish Private Node Connectivity</h2>
 
     <p>All nodes must be reachable on a common private network.</p>
 
     <ul>
-      <li>Install a secure mesh VPN such as Tailscale or WireGuard on the orchestrator and each worker device.</li>
-      <li>Verify each node has a stable private VPN IP.</li>
+      <li>Use LAN addressing when workers are on the same local network as the orchestrator (IPv4 families <code>192.*</code>, <code>10.*</code>, or <code>172.*</code>).</li>
+      <li>Use a secure mesh VPN such as Tailscale or WireGuard for workers outside the host's local network.</li>
       <li>Validate connectivity with <code>ping</code> and <code>ssh</code> before starting distributed jobs.</li>
     </ul>
 
@@ -142,8 +142,8 @@
     <pre><code>#!/usr/bin/env bash
 set -euo pipefail
 
-# VPN IP addresses (examples only)
-MASTER_IP="100.11.22.33"
+# Master address reachable by workers (LAN or VPN)
+MASTER_IP="192.168.1.33"
 IPHONE_A_IP="100.11.22.44"
 IPHONE_B_IP="100.11.22.55"
 
@@ -171,7 +171,7 @@ echo "Distributed processing finished."</code></pre>
 
     <ul>
       <li>Use key-based authentication only.</li>
-      <li>Restrict SSH exposure to the VPN interface.</li>
+      <li>Restrict SSH exposure to trusted private interfaces (LAN and/or VPN).</li>
       <li>Prefer non-root users with minimal privileges.</li>
     </ul>
 
@@ -274,13 +274,13 @@ print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
     <h2>Presentation Outline</h2>
 
     <h3>Slide 1 - Title</h3>
-    <p><strong>Over-the-Internet Distributed Compute Cluster</strong><br />Using Bash orchestration, a secure VPN mesh, and Python distributed workers.</p>
+    <p><strong>Over-the-Internet Distributed Compute Cluster</strong><br />Using Bash orchestration, private LAN/VPN connectivity, and Python distributed workers.</p>
 
     <h3>Slide 2 - Problem</h3>
     <p>Single-device memory and compute limits for larger matrix or model workloads.</p>
 
     <h3>Slide 3 - Architecture</h3>
-    <p>Master orchestrator, VPN mesh, remote worker ranks, and synchronized collectives.</p>
+    <p>Master orchestrator, private network links, remote worker ranks, and synchronized collectives.</p>
 
     <h3>Slide 4 - Optimization Idea</h3>
     <p>Adaptive chunk sizing and communication strategy based on measured latency.</p>

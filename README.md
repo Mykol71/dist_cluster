@@ -1,6 +1,6 @@
 # Distributed Compute Cluster
 
-An experimental network distributed compute cluster that coordinates multiple devices (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
+An experimental network distributed compute cluster that coordinates multiple devices (iPhones, Macs, and other SSH-reachable nodes) over SSH across either a local network or a VPN mesh. Workloads are split across nodes, processed in parallel, and results are synchronized using Python-based collective operations.
 
 ---
 
@@ -109,7 +109,7 @@ Key Findings & Performance Scaling
 
 ### Prerequisites
 
-- Tailscale or WireGuard installed and connected on all devices.
+- Tailscale or WireGuard for nodes that are not on the same local network as the orchestrator.
 - SSH key-based auth configured (see [`docs/ssh_hardening.md`](docs/ssh_hardening.md)).
 - Python 3 + `numpy` (and optionally `mlx`) on all nodes.
 - macOS worker nodes should have either Python 3 preinstalled or Homebrew available so `deploy_cluster.sh` can install it automatically.
@@ -177,5 +177,7 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 | [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine Tailscale setup |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
+
+`run_cluster.sh` is local-network aware for IPv4 ranges that start with `192.*`, `10.*`, or `172.*` (project first-octet rule, including all `172.*`). If a worker node resolves to the same local network family as the host, workers connect to the host's LAN IP and no VPN host configuration is required for that worker. If your cluster mixes LAN-local and VPN-only workers in one run, set `ALLOW_MASTER_WILDCARD_BIND=1` so rank 0 can bind on `0.0.0.0`.
 
 mgreen@mykol.com

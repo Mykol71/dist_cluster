@@ -1,8 +1,8 @@
 # Reproducible Run Commands
 
 This document provides exact, copy-paste commands to reproduce a full cluster run,
-from environment setup through report generation. Replace VPN IP placeholders with
-your actual Tailscale/WireGuard addresses.
+from environment setup through report generation. Use LAN IPs for local-network nodes,
+or VPN IPs for nodes connected through Tailscale/WireGuard.
 
 ---
 
@@ -10,11 +10,12 @@ your actual Tailscale/WireGuard addresses.
 
 | Variable       | Example value       | Description                          |
 |----------------|---------------------|--------------------------------------|
-| `MASTER_IP`    | `100.11.22.33`      | VPN IP of the orchestrator machine   |
-| `WORKER_A_IP`  | `100.11.22.44`      | VPN IP of worker node A (`workerA`)  |
-| `WORKER_B_IP`  | `100.11.22.55`      | VPN IP of worker node B (`workerB`)  |
+| `MASTER_IP`    | `192.168.1.33` or `100.11.22.33` | Master IP reachable by each worker (LAN or VPN) |
+| `WORKER_A_IP`  | `192.168.1.44` or `100.11.22.44` | IP of worker node A (`workerA`) |
+| `WORKER_B_IP`  | `192.168.1.55` or `100.11.22.55` | IP of worker node B (`workerB`) |
 | `SSH_USER`     | `mobile`            | SSH user on worker nodes             |
 | `REMOTE_DIR`   | `/app` or `~/dist_cluster` | Working directory on worker nodes |
+| `ALLOW_MASTER_WILDCARD_BIND` | `1` | Required only when mixing LAN-local and VPN-only workers in one run |
 
 Add the worker aliases to `~/.ssh/config` on the orchestrator for convenience:
 
@@ -34,7 +35,7 @@ Host workerB
 
 ## Step 1 — Validate Connectivity
 
-Before any run, confirm every node is reachable over the VPN:
+Before any run, confirm every node is reachable over the same private path (LAN or VPN):
 
 ```bash
 # Ping check
@@ -148,7 +149,8 @@ cat FINAL_PROJECT_SUMMARY.md
 
 | Symptom                              | Likely cause                  | Fix                                         |
 |--------------------------------------|-------------------------------|---------------------------------------------|
-| `ssh: connect to host … timed out`   | VPN not connected             | Re-connect Tailscale/WireGuard on the node  |
+| `ssh: connect to host … timed out`   | Private network path unavailable (LAN or VPN) | Verify LAN routing/subnet reachability or re-connect Tailscale/WireGuard on the node |
+| Worker cannot reach rank 0 after startup | Local/VPN path mismatch | Re-run with explicit `MASTER_IP`, confirm worker/host IP family mapping (`192.*`, `10.*`, `172.*`), and set `ALLOW_MASTER_WILDCARD_BIND=1` when mixing LAN-local and VPN-only workers |
 | `Permission denied (publickey)`      | Key not deployed              | Re-run `ssh-copy-id` (see `docs/ssh_hardening.md`) |
 | Worker exits immediately             | Python dependency missing     | Re-run `bash deploy_cluster.sh`             |
 | High latency / stall during run      | Poor network conditions       | Check `docs/latency_benchmark_samples.md` decision table |

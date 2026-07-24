@@ -102,7 +102,7 @@
 
     <p>
       An experimental over-the-Internet distributed compute cluster that coordinates multiple devices
-      (iPhones, Macs, and other SSH-reachable nodes) via a VPN mesh. Workloads are split across nodes,
+      (iPhones, Macs, and other SSH-reachable nodes) over SSH across either a local network or a VPN mesh. Workloads are split across nodes,
       processed in parallel, and results are synchronized using Python-based collective operations.
     </p>
 
@@ -203,11 +203,12 @@ sequenceDiagram
 
     <h3>Prerequisites</h3>
     <ul>
-      <li>Tailscale or WireGuard installed and connected on all devices.</li>
+      <li>Tailscale or WireGuard for nodes that are not on the same local network as the orchestrator.</li>
       <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a>).</li>
       <li>Python 3 + <code>numpy</code> (and optionally <code>mlx</code>) on all nodes.</li>
       <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
     </ul>
+    <p><code>run_cluster.sh</code> is local-network aware for IPv4 ranges that start with <code>192.*</code>, <code>10.*</code>, or <code>172.*</code> (project first-octet rule, including all <code>172.*</code>). If a worker is on the same local network family as the host, it uses the host LAN IP and does not require VPN host configuration. For mixed LAN-local and VPN-only workers in one run, set <code>ALLOW_MASTER_WILDCARD_BIND=1</code> so rank 0 can bind on <code>0.0.0.0</code>.</p>
 
     <h3>1. Deploy dependencies to worker nodes</h3>
     <pre><code>bash deploy_cluster.sh</code></pre>
