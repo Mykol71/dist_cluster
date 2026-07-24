@@ -12,16 +12,16 @@ Instead of transferring raw VRAM contents across devices, the practical pattern 
 
 ## High-Level Architecture
 
-```text
-[ Server / Master Node ]  (Primary machine running orchestration script)
-            |
-   (Secure VPN Tunnel)
-   (e.g., Tailscale / WireGuard)
-            |
-      +-----+-----+
-      |           |
- [ iPhone A ] [ iPhone B ]
- (worker node) (worker node)
+```mermaid
+graph TD
+    MASTER["🖥️ Master Node\n(Bash Orchestrator)\nrun_cluster.sh / deploy_cluster.sh"]
+    VPN["🔒 Secure VPN Tunnel\nTailscale / WireGuard\n(Encrypted P2P)"]
+    A["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA\nsrc/train_dist.py"]
+    B["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA\nsrc/train_dist.py"]
+
+    MASTER <-->|"SSH + data chunks"| VPN
+    VPN <-->|"Static private VPN IP"| A
+    VPN <-->|"Static private VPN IP"| B
 ```
 
 ---
@@ -102,6 +102,23 @@ sum_x = mx.distributed.all_sum(x)
 print(f"Rank {rank} synchronized data: {sum_x}")
 ```
 
+### Matrix Data-Flow Diagram
+
+```mermaid
+flowchart LR
+    MAT["📐 Large Matrix\nWorkload"] --> SPLIT["Master: split\ninto row chunks"]
+    SPLIT --> R0["Chunk → Rank 0"]
+    SPLIT --> R1["Chunk → Rank 1"]
+    SPLIT --> R2["Chunk → Rank 2"]
+    R0 --> M["🖥️ Master Node\nlocal dot-product"]
+    R1 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
+    R2 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
+    M --> AGG["all_sum collective\n(aggregate results)"]
+    W1 --> AGG
+    W2 --> AGG
+    AGG --> OUT["✅ Final Result\n+ cluster_performance.csv"]
+```
+
 ---
 
 ## Known Constraints and Risks
@@ -122,14 +139,14 @@ print(f"Rank {rank} synchronized data: {sum_x}")
 
 ## Suggested Validation Workflow
 
-1. Validate VPN connectivity for all nodes.
-2. Validate SSH connectivity and command execution.
-3. Run a latency/bandwidth probe script.
-4. Run small distributed test (`all_sum` smoke test).
-5. Scale workload gradually while logging:
-   - network time
-   - compute time
-   - total wall-clock time
+```mermaid
+flowchart TD
+    S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
+    S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
+    S3 --> S4["4️⃣ Run all_sum smoke test\n(small distributed round-trip)"]
+    S4 --> S5["5️⃣ Scale workload gradually"]
+    S5 --> LOG["📊 Log metrics\nnetwork time · compute time · wall-clock time"]
+```
 
 ---
 
