@@ -32,12 +32,12 @@ flowchart TD
 
 ---
 
-## Step 1 - Establish a Secure Network Tunnel
+## Step 1 - Establish Private Node Connectivity
 
 All nodes must be reachable on a common private network.
 
-- Install a secure mesh VPN such as Tailscale or WireGuard on the orchestrator and each worker device.
-- Verify each node has a stable private VPN IP.
+- Use LAN addressing when workers are on the same local network as the orchestrator (IPv4 families `192.*`, `10.*`, or `172.*`).
+- Use a secure mesh VPN such as Tailscale or WireGuard for workers outside the host's local network.
 - Validate connectivity with `ping` and `ssh` before starting distributed jobs.
 
 ---
@@ -50,8 +50,8 @@ The host script starts worker processes remotely over SSH and launches rank 0 lo
 #!/usr/bin/env bash
 set -euo pipefail
 
-# VPN IP addresses (examples only)
-MASTER_IP="100.11.22.33"
+# Master address reachable by workers (LAN or VPN)
+MASTER_IP="192.168.1.33"
 IPHONE_A_IP="100.11.22.44"
 IPHONE_B_IP="100.11.22.55"
 
@@ -79,7 +79,7 @@ echo "Distributed processing finished."
 ### SSH Notes
 
 - Use key-based authentication only.
-- Restrict SSH exposure to the VPN interface.
+- Restrict SSH exposure to trusted private interfaces (LAN and/or VPN).
 - Prefer non-root users with minimal privileges.
 
 ---
@@ -114,8 +114,8 @@ flowchart LR
     SPLIT --> R1["Chunk → Rank 1"]
     SPLIT --> R2["Chunk → Rank 2"]
     R0 --> M["🖥️ Master Node\nlocal dot-product"]
-    R1 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
-    R2 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
+    R1 -->|"SSH over private network\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
+    R2 -->|"SSH over private network\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
     M --> AGG["all_sum collective\n(aggregate results)"]
     W1 --> AGG
     W2 --> AGG
@@ -147,7 +147,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
+    S1["1️⃣ Validate LAN/VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
     S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
     S3 --> S4["4️⃣ Run all_sum smoke test\n(small distributed round-trip)"]
     S4 --> S5["5️⃣ Scale workload gradually"]
@@ -161,7 +161,7 @@ flowchart TD
 ### Slide 1 - Title
 
 **Over-the-Internet Distributed Compute Cluster**
-Using Bash orchestration, a secure VPN mesh, and Python distributed workers.
+Using Bash orchestration, private LAN/VPN connectivity, and Python distributed workers.
 
 ### Slide 2 - Problem
 
@@ -169,7 +169,7 @@ Single-device memory and compute limits for larger matrix or model workloads.
 
 ### Slide 3 - Architecture
 
-Master orchestrator, VPN mesh, remote worker ranks, and synchronized collectives.
+Master orchestrator, private network links, remote worker ranks, and synchronized collectives.
 
 ### Slide 4 - Optimization Idea
 

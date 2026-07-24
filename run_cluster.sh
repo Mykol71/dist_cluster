@@ -32,6 +32,7 @@ WORKER_BIND_DELAY=2      # seconds to wait after spawning workers so they can bi
 # ─── GLOBALS ────────────────────────────────────────────────────────────────
 
 REMOTE_PIDS=()         # PIDs of background SSH worker processes
+NODE_MASTER_ADDR_PAIRS=()
 
 # ─── CLEANUP / TRAP ─────────────────────────────────────────────────────────
 
@@ -96,6 +97,125 @@ detect_master_ip() {
   if command -v hostname >/dev/null 2>&1; then
     hostname -I 2>/dev/null | awk '{print $1}'
   fi
+}
+
+is_ipv4() {
+  local ip="$1"
+  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+}
+
+local_network_id() {
+  local ip="$1"
+  if ! is_ipv4 "$ip"; then
+    return 1
+  fi
+
+  local first_octet
+  first_octet=$(printf '%s\n' "$ip" | awk -F. '{print $1}')
+  case "$first_octet" in
+    10|172|192)
+      printf '%s\n' "$first_octet"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+get_local_ipv4s() {
+  if command -v ip >/dev/null 2>&1; then
+    ip -4 addr show scope global 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1
+    return 0
+  fi
+
+  if command -v ifconfig >/dev/null 2>&1; then
+    ifconfig 2>/dev/null | awk '/inet /{print $2}' | grep -v '^127\.' || true
+    return 0
+  fi
+
+  if command -v hostname >/dev/null 2>&1; then
+    hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^127\.' || true
+  fi
+}
+
+resolve_node_ipv4() {
+  local node="$1"
+  local ssh_hostname candidate
+  ssh_hostname=$(ssh -G "$node" 2>/dev/null | awk '/^hostname /{print $2; exit}')
+  candidate=${ssh_hostname:-$node}
+
+  if is_ipv4 "$candidate"; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  if command -v getent >/dev/null 2>&1; then
+    getent ahostsv4 "$candidate" 2>/dev/null | awk 'NR==1{print $1}'
+    return 0
+  fi
+
+  if command -v host >/dev/null 2>&1; then
+    host "$candidate" 2>/dev/null | awk '/has address/{print $4; exit}'
+    return 0
+  fi
+
+  if command -v nslookup >/dev/null 2>&1; then
+    nslookup "$candidate" 2>/dev/null | awk '/^Address: /{print $2; exit}'
+  fi
+}
+
+detect_local_master_ip_for_node() {
+  local node_ip="$1"
+  local node_network
+  node_network=$(local_network_id "$node_ip") || return 1
+
+  while IFS= read -r host_ip; do
+    [ -z "$host_ip" ] && continue
+    if [ "$(local_network_id "$host_ip" 2>/dev/null || true)" = "$node_network" ]; then
+      printf '%s\n' "$host_ip"
+      return 0
+    fi
+  done < <(get_local_ipv4s)
+
+  return 1
+}
+
+determine_node_master_addr() {
+  local node="$1"
+  local fallback_master_ip="$2"
+  local node_ip local_master_ip
+
+  node_ip=$(resolve_node_ipv4 "$node" 2>/dev/null || true)
+  if [ -n "$node_ip" ]; then
+    local_master_ip=$(detect_local_master_ip_for_node "$node_ip" 2>/dev/null || true)
+    if [ -n "$local_master_ip" ]; then
+      echo "🏠 [$node] Node IP $node_ip shares local network with host. Using host LAN IP $local_master_ip (VPN host config not required)." >&2
+      printf '%s\n' "$local_master_ip"
+      return 0
+    fi
+  fi
+
+  printf '%s\n' "$fallback_master_ip"
+}
+
+set_node_master_addr() {
+  local node="$1"
+  local master_addr="$2"
+  NODE_MASTER_ADDR_PAIRS+=("$node|$master_addr")
+}
+
+get_node_master_addr() {
+  local node="$1"
+  local default_addr="$2"
+  local pair
+  for pair in "${NODE_MASTER_ADDR_PAIRS[@]}"; do
+    if [ "${pair%%|*}" = "$node" ]; then
+      printf '%s\n' "${pair#*|}"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "$default_addr"
 }
 
 get_remote_os() {
@@ -166,7 +286,7 @@ echo "--------------------------------------------------"
 
 # ── 1. LATENCY PROFILING ────────────────────────────────────────────────────
 
-echo "📡 Measuring network latency across internet VPN..."
+echo "📡 Measuring network latency across available private paths (LAN/VPN)..."
 OPTIMAL_BUFFER=1048576  # default fallback (1 MB)
 
 for node in "${WORKER_NODES[@]}"; do
@@ -183,11 +303,19 @@ echo "--------------------------------------------------"
 # ── 2. PER-NODE HEALTH CHECKS ───────────────────────────────────────────────
 
 echo "🩺 Pre-flight checks on all worker nodes..."
+REQUIRES_MULTI_INTERFACE_BIND=0
 for node in "${WORKER_NODES[@]}"; do
   if ! node_health_check "$node"; then
     echo "❌ Pre-flight failed for node '$node'. Aborting." >&2
     exit 1
   fi
+
+  node_master_ip=$(determine_node_master_addr "$node" "$MASTER_IP")
+  set_node_master_addr "$node" "$node_master_ip"
+  if [ "$node_master_ip" != "$MASTER_IP" ]; then
+    REQUIRES_MULTI_INTERFACE_BIND=1
+  fi
+  echo "🌐 [$node] Worker will connect to master at $node_master_ip:$MASTER_PORT"
 done
 echo "--------------------------------------------------"
 
@@ -206,9 +334,10 @@ for node in "${WORKER_NODES[@]}"; do
   # Launch the remote worker with retry, in the background.
   # The subshell calls ssh_with_retry so we can capture its PID.
   (
+    node_master_ip=$(get_node_master_addr "$node" "$MASTER_IP")
     ssh_with_retry "$node" \
       "cd \"$remote_project_dir\" && \
-       MASTER_ADDR=$MASTER_IP \
+       MASTER_ADDR=$node_master_ip \
        MASTER_PORT=$MASTER_PORT \
        WORLD_SIZE=$WORLD_SIZE \
        RANK=$RANK \
@@ -229,7 +358,13 @@ echo "--------------------------------------------------"
 echo "💻 [RANK 0] Initializing master process locally..."
 echo "--------------------------------------------------"
 
-MASTER_ADDR=$MASTER_IP \
+MASTER_BIND_IP="$MASTER_IP"
+if [ "$REQUIRES_MULTI_INTERFACE_BIND" -eq 1 ]; then
+  MASTER_BIND_IP="0.0.0.0"
+  echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
+fi
+
+MASTER_ADDR=$MASTER_BIND_IP \
 MASTER_PORT=$MASTER_PORT \
 WORLD_SIZE=$WORLD_SIZE \
 RANK=0 \
