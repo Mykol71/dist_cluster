@@ -114,3 +114,5 @@ done
 
 Results are also collected automatically at the start of each `run_cluster.sh` execution.
 See [`docs/run_commands.md`](run_commands.md) for the full workflow.
+
+mgreen@mykol.com
