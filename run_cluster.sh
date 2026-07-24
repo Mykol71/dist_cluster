@@ -101,7 +101,15 @@ detect_master_ip() {
 
 is_ipv4() {
   local ip="$1"
-  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+  local octet
+  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+  IFS='.' read -r -a octets <<< "$ip"
+  for octet in "${octets[@]}"; do
+    if [ "$octet" -lt 0 ] || [ "$octet" -gt 255 ]; then
+      return 1
+    fi
+  done
+  return 0
 }
 
 local_network_id() {
@@ -305,7 +313,7 @@ echo "--------------------------------------------------"
 
 # ── 1. LATENCY PROFILING ────────────────────────────────────────────────────
 
-echo "📡 Measuring network latency across active worker paths (LAN/VPN, with local detection by 192/10/172 family)..."
+echo "📡 Measuring network latency across active worker paths (LAN/VPN, with local detection by project 192/10/172 first-octet rule)..."
 OPTIMAL_BUFFER=1048576  # default fallback (1 MB)
 
 for node in "${WORKER_NODES[@]}"; do
@@ -387,7 +395,7 @@ if [ "$REQUIRES_MULTI_INTERFACE_BIND" -eq 1 ]; then
     echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
     echo "⚠️  Ensure firewall rules only allow TCP $MASTER_PORT from trusted LAN/VPN worker sources."
   else
-    echo "❌ Mixed LAN/VPN worker routing detected. Set ALLOW_MASTER_WILDCARD_BIND=1 to allow binding rank 0 to 0.0.0.0." >&2
+    echo "❌ Mixed LAN/VPN worker routing detected. Set ALLOW_MASTER_WILDCARD_BIND=1 to allow binding rank 0 to 0.0.0.0, and enforce firewall rules for trusted worker sources only." >&2
     exit 1
   fi
 fi
