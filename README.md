@@ -1,46 +1,79 @@
-Part 1: Project Presentation Slides Outline
---
+# dist_cluster
 
+`dist_cluster` is an experimental distributed matrix-computing project that coordinates smartphone worker nodes over a secure VPN. It combines Bash-based orchestration with Python compute workers to explore low-cost, internet-routed parallel execution.
 
-slide 1: Title & Overview
---
-- Title: Over-the-Internet VRAM Pooling and Distributed Compute Cluster
-- Subtitle: Leveraging Bash Process Orchestration and iOS Unified Memory Architectures
-- Core Concept: A cost-effective, parallel matrix computing engine utilizing personal smartphones as distributed worker nodes across a secure VPN tunnel.
+## Overview
 
-slide 2: The Problem & Constraints
---
-- The Hardware Bottleneck: Massive AI model runs and heavy matrix multiplication fail on single consumer devices due to Out-Of-Memory (OOM) VRAM limits.
-- The Unconventional Resource: iPhones use a Unified Memory Architecture (UMA) where the high-bandwidth Apple Silicon GPU and CPU share the same system memory.
-- The Solution: Aggregating this fragmented hardware using a secure, internet-routed cluster pipeline.
+The project investigates whether personal mobile devices can be organized into a practical compute cluster for matrix workloads. Rather than positioning this as a replacement for dedicated HPC hardware, the repository focuses on orchestration, networking behavior, and correctness across distributed workers.
 
-slide 3: System Architecture
---
-- Orchestration Layer: A lightweight, parallelized Bash scripting framework handling authentication, remote processes, and environment setups.
-- Network Layer: Mesh VPN (Tailscale/WireGuard) creating an encrypted peer-to-peer network tunnel using static virtual IPs.
-- Compute Engine: Multi-threaded distributed Python endpoints using raw socket servers to exchange split matrix configurations.
+## Architecture
 
-slide 4: Adaptive Optimization (The Key Innovation)
---
-- The Network Bottleneck: Internet routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.
-- Dynamic Packet Tuning: An automated network ping test executes right before data distribution.
-- Low Latency (Wi-Fi): Drops down to responsive 256KB packet chunks.
-- High Latency (Cellular/LTE): Automatically scales to large 2MB streaming data blocks to maximize throughput.
+The cluster is organized into three layers:
 
-slide 5: Technical Execution Workflow
---
-- Deployment: deploy_cluster.sh uses parallel background tasks to sync code, detect operating systems (iSH Alpine vs Native iOS), and configure dependencies automatically.
-- Profiling: run_cluster.sh benchmarks connection latencies and starts remote background worker ranks over SSH.
-- Calculation: Workers stream data chunks, process heavy dot-product row loops inside their hardware memory pools, and return calculations.
-- Verification: The master node aggregates chunks, renders progress bars, saves a final unified .csv report, and engages mathematical delta checkers.
+- **Orchestration (Bash):** shell scripts coordinate remote setup, deployment, and worker startup.
+- **Network (VPN):** encrypted connectivity is established via a Tailscale/WireGuard-style mesh.
+- **Compute (Python):** worker processes handle matrix partitions and return partial results to a master node.
 
-slide 6: Key Findings & Performance Scaling
---
-- Compute vs. Network Cost: iPhone hardware handles local matrix multiplication instantly, but internet bandwidth limits linear speedup scaling.
-- Amdahl's Law in Action: The project illustrates how a slower communication layer introduces parallel overhead, demonstrating real-world high-performance computing (HPC) constraints.
+## Adaptive Optimization
 
+Before distributed execution, the workflow profiles network conditions and adjusts transfer behavior. The current scripts include latency-aware buffering logic intended to reduce network overhead under different link conditions.
 
-Notes:
---
-- There are approximately 1.52 billion active iPhone users worldwide.
-- To match the raw compute and VRAM footprint of a single NVIDIA RTX 3090 (35.6 FP16 TFLOPS, 24GB VRAM), you would need a cluster of roughly 15 to 20 iPhone 15 Pro Max devices.
+## Execution Workflow
+
+1. **Deploy:** `deploy_cluster.sh` checks node connectivity, prepares remote environments, and syncs project files.
+2. **Profile and run:** `run_cluster.sh` performs latency-oriented prechecks and launches distributed workers.
+3. **Compute:** workers process assigned matrix chunks and send results back to the coordinator.
+4. **Verify/report:** verification and logging scripts are used to check output integrity and capture run metrics.
+
+## Key Findings
+
+- Distributed execution across consumer devices is technically feasible.
+- End-to-end performance is often constrained by network latency and transfer overhead.
+- Communication costs can limit linear scaling even when local computation is fast.
+
+## Notes and Limitations
+
+- This repository should be read as a prototype/experiment, not a benchmark-validated performance study.
+- Hardware-equivalence claims (for example, smartphone clusters vs. desktop GPUs) should be treated as conceptual unless backed by reproducible measurements from this repo.
+- Results are sensitive to network quality, device heterogeneity, and runtime setup.
+
+## Tech Stack
+
+- **Bash** for orchestration and remote automation
+- **Python** for distributed compute, verification, and reporting
+- **SSH** for remote process execution
+- **Tailscale / WireGuard** for secure node connectivity
+
+## Future Improvements
+
+- Add reproducible benchmark methodology and published result sets
+- Document end-to-end setup and execution steps in more detail
+- Improve fault tolerance/retry handling for unstable nodes
+- Add clearer architecture and data-flow diagrams
+
+## Presentation Outline (for talk/slides)
+
+### Slide 1 — Title and Overview
+- Over-the-Internet distributed compute cluster concept
+- Smartphone-based worker pool coordinated by Bash and Python
+
+### Slide 2 — Problem and Constraints
+- Single-device memory and compute limits for larger workloads
+- Need for secure connectivity across geographically distributed nodes
+
+### Slide 3 — System Architecture
+- Orchestration layer (Bash)
+- Secure network layer (VPN)
+- Compute layer (Python workers)
+
+### Slide 4 — Adaptive Optimization
+- Latency variability as a core bottleneck
+- Pre-run network profiling and transfer tuning
+
+### Slide 5 — Execution Workflow
+- Deploy, profile, run workers, aggregate, verify
+
+### Slide 6 — Findings and Practical Takeaways
+- Feasibility demonstrated
+- Network overhead as the dominant scaling constraint
+- Experimental value in distributed-systems learning
