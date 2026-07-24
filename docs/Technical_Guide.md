@@ -1,6 +1,6 @@
 # Technical Guide - Distributed Cluster
 
-This guide expands on the project overview from `/home/runner/work/dist_cluster/dist_cluster/index.html` and presents the same architecture, workflow, and diagram style in a documentation-focused format.
+This guide expands on the project overview from `index.html` and presents the same architecture, workflow, and diagram style in a documentation-focused format.
 
 ---
 
@@ -178,7 +178,7 @@ Adaptive chunk sizing and communication strategy based on measured latency.
 
 ### Slide 5 - Execution Flow
 
-Deploy -> profile network -> launch ranks -> compute -> verify -> report.
+Deploy → profile network → launch ranks → compute → verify → report.
 
 ### Slide 6 - Results and Trade-offs
 
