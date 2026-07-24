@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Technical Guide - Distributed Cluster</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+      color: #e6edf3;
+      background: #0d1117;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    h1, h2, h3 { border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; }
+    h1 { border-bottom-width: 2px; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.875em;
+      padding: 0.15em 0.4em;
+    }
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+    }
+    pre code { background: none; border: none; padding: 0; }
+    hr { border: none; border-top: 1px solid #30363d; margin: 2rem 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #30363d; padding: 0.55rem 0.9rem; text-align: left; }
+    th { background: #161b22; }
+    tr:nth-child(even) td { background: #161b22; }
+    .mermaid {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin: 1.25rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="content">
+    <p>Loading technical guide...</p>
+  </div>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+    const renderer = new marked.Renderer();
+    renderer.code = ({ text, lang }) => {
+      if (lang === 'mermaid') {
+        return `<div class="mermaid">${text}</div>`;
+      }
+      const safeLang = lang ? ` class="language-${lang}"` : '';
+      return `<pre><code${safeLang}>${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+    };
+
+    fetch('./Technical_Guide.md')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load Technical_Guide.md');
+        }
+        return response.text();
+      })
+      .then(markdown => {
+        document.getElementById('content').innerHTML = marked.parse(markdown, { renderer });
+        mermaid.run({ querySelector: '.mermaid' });
+      })
+      .catch(error => {
+        document.getElementById('content').innerHTML = `<p>Unable to load guide: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html>
