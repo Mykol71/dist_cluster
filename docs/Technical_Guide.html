@@ -182,7 +182,6 @@ echo "Distributed processing finished."</code></pre>
     <p>Each process initializes distributed communication and runs synchronized operations.</p>
 
     <pre><code>import mlx.core as mx
-import mlx.nn as nn  # kept for future model components
 
 mx.distributed.init()
 
@@ -335,9 +334,9 @@ src/ping_test.py         # network latency evaluation</code></pre>
     <h2>Next Actions</h2>
 
     <ul>
-      <li>✅ Add SSH hardening guide (<a href="ssh_hardening.md"><code>docs/ssh_hardening.md</code></a>)</li>
-      <li>✅ Add latency benchmark script output samples (<a href="latency_benchmark_samples.md"><code>docs/latency_benchmark_samples.md</code></a>)</li>
-      <li>✅ Add reproducible run command examples (<a href="run_commands.md"><code>docs/run_commands.md</code></a>)</li>
+      <li>✅ Add SSH hardening guide (<a href="./ssh_hardening.md"><code>docs/ssh_hardening.md</code></a>)</li>
+      <li>✅ Add latency benchmark script output samples (<a href="./latency_benchmark_samples.md"><code>docs/latency_benchmark_samples.md</code></a>)</li>
+      <li>✅ Add reproducible run command examples (<a href="./run_commands.md"><code>docs/run_commands.md</code></a>)</li>
       <li>✅ Add failure-handling and retry strategy in orchestration (<code>run_cluster.sh</code>)</li>
       <li>✅ Add a concise README version of this architecture (<code>README.md</code>)</li>
     </ul>

@@ -90,7 +90,6 @@ Each process initializes distributed communication and runs synchronized operati
 
 ```python
 import mlx.core as mx
-import mlx.nn as nn  # kept for future model components
 
 mx.distributed.init()
 
