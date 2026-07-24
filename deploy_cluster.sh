@@ -14,25 +14,25 @@ echo "🚀 Initializing Parallel Deployment & Dependency Engine"
 echo "=================================================="
 
 get_remote_os() {
-local node="$1"
-ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" "uname -s" 2>/dev/null || true
+  local node="$1"
+  ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" "uname -s" 2>/dev/null || true
 }
 
 get_remote_project_dir() {
-local node="$1"
-if [ -n "${REMOTE_PROJECT_DIR:-}" ]; then
-printf '%s\n' "$REMOTE_PROJECT_DIR"
-return 0
-fi
+  local node="$1"
+  if [ -n "${REMOTE_PROJECT_DIR:-}" ]; then
+    printf '%s\n' "$REMOTE_PROJECT_DIR"
+    return 0
+  fi
 
-case "$(get_remote_os "$node")" in
-Darwin)
-ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" "printf '%s\n' \"\$HOME/$DEFAULT_DARWIN_REMOTE_PROJECT_DIR\"" 2>/dev/null
-;;
-*)
-printf '%s\n' "$DEFAULT_LINUX_REMOTE_PROJECT_DIR"
-;;
-esac
+  case "$(get_remote_os "$node")" in
+    Darwin)
+      ssh -q -o ConnectTimeout=5 -o BatchMode=yes "$node" "printf '%s\n' \"\$HOME/$DEFAULT_DARWIN_REMOTE_PROJECT_DIR\"" 2>/dev/null
+      ;;
+    *)
+      printf '%s\n' "$DEFAULT_LINUX_REMOTE_PROJECT_DIR"
+      ;;
+  esac
 }
 
 deploy_and_verify_node() {

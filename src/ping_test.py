@@ -6,8 +6,15 @@ import sys
 def get_average_ping(host):
     """Ping a remote node and return its average round-trip time in milliseconds."""
     try:
+        cmd = ["ping", "-c", "3"]
+        if sys.platform == "darwin":
+            cmd.extend(["-W", "2000"])
+        else:
+            cmd.extend(["-W", "2"])
+        cmd.append(host)
+
         result = subprocess.run(
-            ["ping", "-c", "3", host],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
