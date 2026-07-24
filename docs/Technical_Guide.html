@@ -51,7 +51,7 @@
 
 <h2>High-Level Architecture</h2>
 
-<pre><code class="language-mermaid">
+<pre><code class="language-text">
 graph TD
     MASTER["🖥️ Master Node\n(Bash Orchestrator)\nrun_cluster.sh / deploy_cluster.sh"]
     VPN["🔒 Secure VPN Tunnel\nTailscale / WireGuard\n(Encrypted P2P)"]
@@ -97,11 +97,11 @@ echo "Initializing distributed cluster..."
 
 # 1) Start worker rank 1
 ssh mobile@"$IPHONE_A_IP" \
-  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
 
 # 2) Start worker rank 2
 ssh mobile@"$IPHONE_B_IP" \
-  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
 
 # 3) Start rank 0 on master
 echo "Launching master process..."
@@ -142,7 +142,7 @@ print(f"Rank {rank} synchronized data: {sum_x}")
 
 <h3>Matrix Data-Flow Diagram</h3>
 
-<pre><code class="language-mermaid">
+<pre><code class="language-text">
 flowchart LR
     MAT["📐 Large Matrix\nWorkload"] --> SPLIT["Master: split\ninto row chunks"]
     SPLIT --> R0["Chunk → Rank 0"]
@@ -180,7 +180,7 @@ flowchart LR
 
 <h2>Suggested Validation Workflow</h2>
 
-<pre><code class="language-mermaid">
+<pre><code class="language-text">
 flowchart TD
     S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
     S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
