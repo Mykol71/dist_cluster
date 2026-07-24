@@ -4,8 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Technical Guide - Distributed Cluster</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       line-height: 1.7;
@@ -14,16 +16,31 @@
       margin: 0;
       padding: 0;
     }
+
     .container {
-      max-width: 980px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 2rem 1.5rem 4rem;
     }
+
     h1 { font-size: 2rem; border-bottom: 2px solid #30363d; padding-bottom: 0.4rem; margin-top: 2rem; }
     h2 { font-size: 1.5rem; border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; margin-top: 2rem; }
     h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+
     p { margin: 0.75rem 0; }
-    hr { border: none; border-top: 1px solid #30363d; margin: 2rem 0; }
+
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.875em;
+      padding: 0.15em 0.4em;
+    }
+
     pre {
       background: #161b22;
       border: 1px solid #30363d;
@@ -31,56 +48,98 @@
       padding: 1rem 1.25rem;
       overflow-x: auto;
       font-size: 0.875rem;
-      white-space: pre;
     }
-    code {
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    ul, ol { padding-left: 1.5rem; margin: 0.75rem 0; }
+    li { margin: 0.35rem 0; }
+
+    hr { border: none; border-top: 1px solid #30363d; margin: 2rem 0; }
+
+    .mermaid {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin: 1.25rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    footer {
+      margin-top: 3rem;
+      color: #8b949e;
+      font-size: 0.875rem;
     }
   </style>
 </head>
 <body>
   <div class="container">
-<h1>Distributed Network Cluster Notes</h1>
+    <p><a href="../index.html">← Back to project overview</a></p>
 
-<h2>Overview</h2>
+    <h1>Technical Guide - Distributed Cluster</h1>
 
-<p>This document describes a distributed compute experiment that coordinates multiple devices over a secure network.</p>
-<p>Instead of transferring raw VRAM contents across devices, the practical pattern is to split model/workload state across nodes (for example, tensor/model/data parallel strategies) and synchronize intermediate results.</p>
+    <p>
+      This guide expands on the project overview from <a href="../index.html">the main Pages landing page</a>
+      and presents the same architecture, workflow, and diagram style in a documentation-focused format.
+    </p>
 
-<hr />
+    <hr />
 
-<h2>High-Level Architecture</h2>
+    <h2>Overview</h2>
 
-<pre><code class="language-text">
-[Master Node: run_cluster.sh / deploy_cluster.sh]
-        │
-        │ SSH + data chunks over encrypted VPN
-        ▼
-[Secure VPN Tunnel: Tailscale or WireGuard]
-        ├── [iPhone A: Worker Rank 1]
-        └── [iPhone B: Worker Rank 2]
-</code></pre>
+    <p>
+      This distributed compute experiment coordinates multiple devices over a secure network.
+      Instead of transferring raw VRAM contents across devices, the practical approach is to split
+      model or workload state across nodes and synchronize intermediate results.
+    </p>
 
-<hr />
+    <hr />
 
-<h2>Step 1 — Establish a Secure Network Tunnel</h2>
+    <h2>High-Level Architecture</h2>
 
-<p>All nodes must be reachable on a common private network.</p>
+    <div class="mermaid">
+flowchart TD
+    subgraph OL["Orchestration Layer"]
+        ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
+    end
+    subgraph NL["Network Layer"]
+        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+    end
+    subgraph CL["Compute Layer"]
+        W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
+        W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
+    end
+    ORCH <-->|"SSH + Matrix Chunks"| VPN
+    VPN <-->|"Private VPN IP"| W1
+    VPN <-->|"Private VPN IP"| W2
+    </div>
 
-<p>• Install a secure mesh VPN (e.g., Tailscale or WireGuard) on:</p>
-<p>• the orchestrator machine</p>
-<p>• each worker device</p>
-<p>• Verify each node has a stable private VPN IP.</p>
-<p>• Validate connectivity (`ping`, then `ssh`) before starting distributed jobs.</p>
+    <hr />
 
-<hr />
+    <h2>Step 1 - Establish a Secure Network Tunnel</h2>
 
-<h2>Step 2 — Bash Orchestrator (Master Control)</h2>
+    <p>All nodes must be reachable on a common private network.</p>
 
-<p>The host script starts worker processes remotely via SSH and launches rank 0 locally.</p>
+    <ul>
+      <li>Install a secure mesh VPN such as Tailscale or WireGuard on the orchestrator and each worker device.</li>
+      <li>Verify each node has a stable private VPN IP.</li>
+      <li>Validate connectivity with <code>ping</code> and <code>ssh</code> before starting distributed jobs.</li>
+    </ul>
 
-<pre><code class="language-bash">
-#!/usr/bin/env bash
+    <hr />
+
+    <h2>Step 2 - Bash Orchestrator (Master Control)</h2>
+
+    <p>The host script starts worker processes remotely over SSH and launches rank 0 locally.</p>
+
+    <pre><code>#!/usr/bin/env bash
 set -euo pipefail
 
 # VPN IP addresses (examples only)
@@ -95,34 +154,34 @@ echo "Initializing distributed cluster..."
 
 # 1) Start worker rank 1
 ssh mobile@"$IPHONE_A_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
+  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;  # keep worker launches concurrent
 
 # 2) Start worker rank 2
 ssh mobile@"$IPHONE_B_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
+  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;  # keep worker launches concurrent
 
 # 3) Start rank 0 on master
 echo "Launching master process..."
 mx.distributed --world-size "$WORLD_SIZE" --rank 0 --master-addr "$MASTER_IP" --master-port "$PORT" python3 train_dist.py
 
 wait
-echo "Distributed processing finished."
-</code></pre>
+echo "Distributed processing finished."</code></pre>
 
-<h3>SSH Notes</h3>
+    <h3>SSH Notes</h3>
 
-<p>• Use key-based auth only (disable password auth where possible).</p>
-<p>• Restrict SSH exposure to VPN interface.</p>
-<p>• Prefer non-root users with minimal privileges.</p>
+    <ul>
+      <li>Use key-based authentication only.</li>
+      <li>Restrict SSH exposure to the VPN interface.</li>
+      <li>Prefer non-root users with minimal privileges.</li>
+    </ul>
 
-<hr />
+    <hr />
 
-<h2>Step 3 — Worker Script (`train_dist.py`)</h2>
+    <h2>Step 3 - Worker Script (<code>train_dist.py</code>)</h2>
 
-<p>Each process initializes distributed communication and runs synchronized operations.</p>
+    <p>Each process initializes distributed communication and runs synchronized operations.</p>
 
-<pre><code class="language-python">
-import mlx.core as mx
+    <pre><code>import mlx.core as mx
 
 mx.distributed.init()
 
@@ -135,155 +194,160 @@ if rank == 0:
 x = mx.array([1.0, 2.0, 3.0]) * (rank + 1)
 sum_x = mx.distributed.all_sum(x)
 
-print(f"Rank {rank} synchronized data: {sum_x}")
-</code></pre>
+print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
 
-<h3>Matrix Data-Flow Diagram</h3>
+    <h3>Matrix Data-Flow Diagram</h3>
 
-<pre><code class="language-text">
-Large matrix workload
-  1) Master splits rows into chunks
-  2) Chunks are sent to Rank 0, Rank 1, and Rank 2
-  3) Each rank computes local dot-product loops
-  4) all_sum collective aggregates partial outputs
-  5) Final result and cluster_performance.csv are produced
-</code></pre>
+    <div class="mermaid">
+flowchart LR
+    MAT["📐 Large Matrix\nWorkload"] --> SPLIT["Master: split\ninto row chunks"]
+    SPLIT --> R0["Chunk → Rank 0"]
+    SPLIT --> R1["Chunk → Rank 1"]
+    SPLIT --> R2["Chunk → Rank 2"]
+    R0 --> M["🖥️ Master Node\nlocal dot-product"]
+    R1 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
+    R2 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
+    M --> AGG["all_sum collective\n(aggregate results)"]
+    W1 --> AGG
+    W2 --> AGG
+    AGG --> OUT["✅ Final Result\n+ cluster_performance.csv"]
+    </div>
 
-<hr />
+    <hr />
 
-<h2>Known Constraints and Risks</h2>
+    <h2>Known Constraints and Risks</h2>
 
-<h3>1) Network Bottleneck</h3>
+    <h3>1) Network Bottleneck</h3>
+    <ul>
+      <li>Device-local memory bandwidth is much higher than Internet links.</li>
+      <li>Collective operations such as <code>all_sum</code> can become communication-bound quickly.</li>
+    </ul>
 
-<p>• Device-local memory bandwidth is much higher than Internet links.</p>
-<p>• Collective operations (`all_sum`, etc.) can become communication-bound quickly.</p>
+    <h3>2) iOS Background Execution Limits</h3>
+    <ul>
+      <li>iOS may suspend or terminate long-running background terminal processes.</li>
+      <li>Keep apps active and device power settings in mind during experiments.</li>
+    </ul>
 
-<h3>2) iOS Background Execution Limits</h3>
+    <h3>3) Reliability</h3>
+    <ul>
+      <li>WAN jitter and packet loss can create stragglers and unstable step times.</li>
+      <li>Add retries, health checks, and timeout handling in orchestration scripts.</li>
+    </ul>
 
-<p>• iOS may suspend or terminate long-running/background terminal processes.</p>
-<p>• Keep apps active and device power settings in mind during experiments.</p>
+    <hr />
 
-<h3>3) Reliability</h3>
+    <h2>Suggested Validation Workflow</h2>
 
-<p>• WAN jitter/packet loss causes stragglers and unstable step time.</p>
-<p>• Add retries, health checks, and timeout handling in orchestration scripts.</p>
+    <div class="mermaid">
+flowchart TD
+    S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
+    S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
+    S3 --> S4["4️⃣ Run all_sum smoke test\n(small distributed round-trip)"]
+    S4 --> S5["5️⃣ Scale workload gradually"]
+    S5 --> LOG["📊 Log metrics\nnetwork time · compute time · wall-clock time"]
+    </div>
 
-<hr />
+    <hr />
 
-<h2>Suggested Validation Workflow</h2>
+    <h2>Presentation Outline</h2>
 
-<pre><code class="language-text">
-1) Validate VPN connectivity for all nodes
-2) Validate SSH connectivity and remote command execution
-3) Run latency/bandwidth probe script (ping_test.py)
-4) Run a small all_sum distributed smoke test
-5) Scale workload gradually
-6) Log network time, compute time, and wall-clock metrics
-</code></pre>
+    <h3>Slide 1 - Title</h3>
+    <p><strong>Over-the-Internet Distributed Compute Cluster</strong><br />Using Bash orchestration, a secure VPN mesh, and Python distributed workers.</p>
 
-<hr />
+    <h3>Slide 2 - Problem</h3>
+    <p>Single-device memory and compute limits for larger matrix or model workloads.</p>
 
-<h2>Presentation Outline (Submission-Friendly)</h2>
+    <h3>Slide 3 - Architecture</h3>
+    <p>Master orchestrator, VPN mesh, remote worker ranks, and synchronized collectives.</p>
 
-<h3>Slide 1 — Title</h3>
+    <h3>Slide 4 - Optimization Idea</h3>
+    <p>Adaptive chunk sizing and communication strategy based on measured latency.</p>
 
-<p><strong>Over-the-Internet Distributed Compute Cluster</strong></p>
-<p>Using Bash orchestration + secure VPN + Python distributed workers.</p>
+    <h3>Slide 5 - Execution Flow</h3>
+    <p>Deploy → profile network → launch ranks → compute → verify → report.</p>
 
-<h3>Slide 2 — Problem</h3>
+    <h3>Slide 6 - Results and Trade-offs</h3>
+    <p>Speedup versus communication overhead, with an Amdahl's Law interpretation.</p>
 
-<p>Single-device memory/compute limits for large matrix/model workloads.</p>
+    <hr />
 
-<h3>Slide 3 — Architecture</h3>
+    <h2>Automated Summary Report Generator (<code>generate_report.py</code>)</h2>
 
-<p>Master orchestrator, VPN mesh, remote worker ranks, synchronized collectives.</p>
+    <p>Use a reporting script to compile telemetry into a final Markdown report.</p>
 
-<h3>Slide 4 — Optimization Idea</h3>
+    <h3>Purpose</h3>
+    <ul>
+      <li>Parse <code>cluster_performance.csv</code>.</li>
+      <li>Compute speedup metrics.</li>
+      <li>Emit <code>FINAL_PROJECT_SUMMARY.md</code>.</li>
+    </ul>
 
-<p>Adaptive chunk sizing / communication strategy based on measured latency.</p>
+    <h3>Recommended Quality Improvements</h3>
+    <ul>
+      <li>Add argument parsing with <code>argparse</code> for log and report paths.</li>
+      <li>Validate CSV schema before reading.</li>
+      <li>Handle malformed numeric fields with guarded parsing.</li>
+      <li>Include min, avg, and max latency plus per-run variance.</li>
+      <li>Add exit codes for CI usage.</li>
+    </ul>
 
-<h3>Slide 5 — Execution Flow</h3>
+    <hr />
 
-<p>Deploy → profile network → launch ranks → compute → verify → report.</p>
+    <h2>Pipeline Hook Example (<code>run_cluster.sh</code>)</h2>
 
-<h3>Slide 6 — Results and Trade-offs</h3>
+    <p>Append post-run hooks:</p>
 
-<p>Speedup vs communication overhead, with Amdahl's Law interpretation.</p>
-
-<hr />
-
-<h2>Automated Summary Report Generator (`generate_report.py`)</h2>
-
-<p>Use a reporting script to compile telemetry into a final markdown report.</p>
-
-<h3>Purpose</h3>
-
-<p>• Parse `cluster_performance.csv`</p>
-<p>• Compute speedup metrics</p>
-<p>• Emit `FINAL_PROJECT_SUMMARY.md`</p>
-
-<h3>Recommended Quality Improvements</h3>
-
-<p>• Add argument parsing (`argparse`) for log/report paths.</p>
-<p>• Validate CSV schema before reading.</p>
-<p>• Handle malformed numeric fields with guarded parsing.</p>
-<p>• Include min/avg/max latency and per-run variance.</p>
-<p>• Add exit codes for CI usage.</p>
-
-<hr />
-
-<h2>Pipeline Hook Example (`run_cluster.sh`)</h2>
-
-<p>Append post-run hooks:</p>
-
-<pre><code class="language-bash">
-# 4) Invoke logger and report generator
+    <pre><code># 4) Invoke logger and report generator
 if [ -f "./log_metrics.py" ]; then
   python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
 fi
 
 if [ -f "./generate_report.py" ]; then
   python3 ./generate_report.py
-fi
-</code></pre>
+fi</code></pre>
 
-<hr />
+    <hr />
 
-<h2>Expected Project Structure</h2>
+    <h2>Expected Project Structure</h2>
 
-<pre><code class="language-text">
-deploy_cluster.sh        # node provisioning and setup
+    <pre><code>deploy_cluster.sh        # node provisioning and setup
 run_cluster.sh           # orchestration and benchmark execution
 verify_output.py         # numerical correctness checks
 log_metrics.py           # telemetry logging and graph outputs
 generate_report.py       # final markdown report generation
 src/train_dist.py        # distributed compute entrypoint
-src/ping_test.py         # network latency evaluation
-</code></pre>
+src/ping_test.py         # network latency evaluation</code></pre>
 
-<hr />
+    <hr />
 
-<h2>Source Quality Note</h2>
+    <h2>Source Quality Note</h2>
 
-<p>The original notes include mixed references (forums, social posts, slide sites, and generated narrative).</p>
-<p>For final academic/professional submission, prefer:</p>
+    <p>
+      The original notes include mixed references such as forums, social posts, slide sites, and generated narrative.
+      For final academic or professional submission, prefer official framework documentation, reproducible benchmarks,
+      primary technical references, and clearly versioned tooling and environment details.
+    </p>
 
-<p>• official framework docs</p>
-<p>• reproducible benchmarks</p>
-<p>• primary technical references</p>
-<p>• clearly versioned tooling and environment details</p>
+    <hr />
 
-<hr />
+    <h2>Next Actions</h2>
 
-<h2>Next Actions</h2>
+    <ul>
+      <li>✅ Add SSH hardening guide (<a href="./ssh_hardening.md"><code>docs/ssh_hardening.md</code></a>)</li>
+      <li>✅ Add latency benchmark script output samples (<a href="./latency_benchmark_samples.md"><code>docs/latency_benchmark_samples.md</code></a>)</li>
+      <li>✅ Add reproducible run command examples (<a href="./run_commands.md"><code>docs/run_commands.md</code></a>)</li>
+      <li>✅ Add failure-handling and retry strategy in orchestration (<code>run_cluster.sh</code>)</li>
+      <li>✅ Add a concise README version of this architecture (<code>README.md</code>)</li>
+    </ul>
 
-<p>✅ Add SSH hardening guide (`docs/ssh_hardening.md`)</p>
-<p>✅ Add latency benchmark script output samples (`docs/latency_benchmark_samples.md`)</p>
-<p>✅ Add reproducible run command examples (`docs/run_commands.md`)</p>
-<p>✅ Add failure-handling and retry strategy in orchestration (`run_cluster.sh`)</p>
-<p>✅ Add a concise README version of this architecture (`README.md`)</p>
-
-<p>Contact: mgreen [at] mykol [dot] com</p>
+    <footer>
+      <a href="mailto:mgreen@mykol.com">mgreen@mykol.com</a>
+    </footer>
   </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+  </script>
 </body>
 </html>
