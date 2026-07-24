@@ -130,7 +130,7 @@ get_local_ipv4s() {
   fi
 
   if command -v ifconfig >/dev/null 2>&1; then
-    ifconfig 2>/dev/null | awk '/inet /{gsub(/addr:/, "", $2); print $2}' | grep -v '^127\.' || true
+    ifconfig 2>/dev/null | awk '/inet /{ip=$2; sub(/^addr:/, "", ip); if (ip ~ /^[0-9]+\./) print ip}' | grep -v '^127\.' || true
     return 0
   fi
 
@@ -160,8 +160,8 @@ resolve_node_ipv4() {
     return 0
   fi
 
-  if command -v nslookup >/dev/null 2>&1; then
-    nslookup "$candidate" 2>/dev/null | awk '/^Address/{print $NF; exit}'
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "import socket; print(socket.gethostbyname('$candidate'))" 2>/dev/null
   fi
 }
 
@@ -190,7 +190,6 @@ determine_node_master_addr() {
   if [ -n "$node_ip" ]; then
     local_master_ip=$(detect_local_master_ip_for_node "$node_ip" 2>/dev/null || true)
     if [ -n "$local_master_ip" ]; then
-      echo "🏠 [$node] Node IP $node_ip shares local network with host. Using host LAN IP $local_master_ip (VPN host config not required)."
       printf '%s\n' "$local_master_ip"
       return 0
     fi
@@ -315,6 +314,7 @@ for node in "${WORKER_NODES[@]}"; do
   set_node_master_addr "$node" "$node_master_ip"
   if [ "$node_master_ip" != "$MASTER_IP" ]; then
     REQUIRES_MULTI_INTERFACE_BIND=1
+    echo "🏠 [$node] Local-network worker detected. Using host LAN IP $node_master_ip (VPN host config not required)."
   fi
   echo "🌐 [$node] Worker will connect to master at $node_master_ip:$MASTER_PORT"
 done
@@ -361,6 +361,8 @@ echo "--------------------------------------------------"
 
 MASTER_BIND_IP="$MASTER_IP"
 if [ "$REQUIRES_MULTI_INTERFACE_BIND" -eq 1 ]; then
+  # Mixed LAN/VPN workers may require different host-reachable addresses.
+  # Bind all interfaces and rely on host firewall/private network controls.
   MASTER_BIND_IP="0.0.0.0"
   echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
 fi
