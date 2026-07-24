@@ -53,14 +53,14 @@
 
 <pre><code class="language-mermaid">
 graph TD
-    MASTER[&quot;🖥️ Master Node\n(Bash Orchestrator)\nrun_cluster.sh / deploy_cluster.sh&quot;]
-    VPN[&quot;🔒 Secure VPN Tunnel\nTailscale / WireGuard\n(Encrypted P2P)&quot;]
-    A[&quot;📱 iPhone A\nWorker Rank 1\nApple Silicon UMA\nsrc/train_dist.py&quot;]
-    B[&quot;📱 iPhone B\nWorker Rank 2\nApple Silicon UMA\nsrc/train_dist.py&quot;]
+    MASTER["🖥️ Master Node\n(Bash Orchestrator)\nrun_cluster.sh / deploy_cluster.sh"]
+    VPN["🔒 Secure VPN Tunnel\nTailscale / WireGuard\n(Encrypted P2P)"]
+    A["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA\nsrc/train_dist.py"]
+    B["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA\nsrc/train_dist.py"]
 
-    MASTER &lt;--&gt;|&quot;SSH + data chunks&quot;| VPN
-    VPN &lt;--&gt;|&quot;Static private VPN IP&quot;| A
-    VPN &lt;--&gt;|&quot;Static private VPN IP&quot;| B
+    MASTER &lt;-->|"SSH + data chunks"| VPN
+    VPN &lt;-->|"Static private VPN IP"| A
+    VPN &lt;-->|"Static private VPN IP"| B
 </code></pre>
 
 <hr />
@@ -86,29 +86,29 @@ graph TD
 set -euo pipefail
 
 # VPN IP addresses (examples only)
-MASTER_IP=&quot;100.11.22.33&quot;
-IPHONE_A_IP=&quot;100.11.22.44&quot;
-IPHONE_B_IP=&quot;100.11.22.55&quot;
+MASTER_IP="100.11.22.33"
+IPHONE_A_IP="100.11.22.44"
+IPHONE_B_IP="100.11.22.55"
 
 WORLD_SIZE=3   # total processes: rank 0 + two workers
 PORT=8080
 
-echo &quot;Initializing distributed cluster...&quot;
+echo "Initializing distributed cluster..."
 
 # 1) Start worker rank 1
-ssh mobile@&quot;$IPHONE_A_IP&quot; \
-  &quot;cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py&quot; &amp;
+ssh mobile@"$IPHONE_A_IP" \
+  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;
 
 # 2) Start worker rank 2
-ssh mobile@&quot;$IPHONE_B_IP&quot; \
-  &quot;cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py&quot; &amp;
+ssh mobile@"$IPHONE_B_IP" \
+  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;
 
 # 3) Start rank 0 on master
-echo &quot;Launching master process...&quot;
-mx.distributed --world-size &quot;$WORLD_SIZE&quot; --rank 0 --master-addr &quot;$MASTER_IP&quot; --master-port &quot;$PORT&quot; python3 train_dist.py
+echo "Launching master process..."
+mx.distributed --world-size "$WORLD_SIZE" --rank 0 --master-addr "$MASTER_IP" --master-port "$PORT" python3 train_dist.py
 
 wait
-echo &quot;Distributed processing finished.&quot;
+echo "Distributed processing finished."
 </code></pre>
 
 <h3>SSH Notes</h3>
@@ -132,29 +132,29 @@ rank = mx.distributed.get_rank()
 world_size = mx.distributed.get_world_size()
 
 if rank == 0:
-    print(f&quot;Master node online. World size: {world_size}&quot;)
+    print(f"Master node online. World size: {world_size}")
 
 x = mx.array([1.0, 2.0, 3.0]) * (rank + 1)
 sum_x = mx.distributed.all_sum(x)
 
-print(f&quot;Rank {rank} synchronized data: {sum_x}&quot;)
+print(f"Rank {rank} synchronized data: {sum_x}")
 </code></pre>
 
 <h3>Matrix Data-Flow Diagram</h3>
 
 <pre><code class="language-mermaid">
 flowchart LR
-    MAT[&quot;📐 Large Matrix\nWorkload&quot;] --&gt; SPLIT[&quot;Master: split\ninto row chunks&quot;]
-    SPLIT --&gt; R0[&quot;Chunk → Rank 0&quot;]
-    SPLIT --&gt; R1[&quot;Chunk → Rank 1&quot;]
-    SPLIT --&gt; R2[&quot;Chunk → Rank 2&quot;]
-    R0 --&gt; M[&quot;🖥️ Master Node\nlocal dot-product&quot;]
-    R1 --&gt;|&quot;SSH over VPN\n+ BUFFER_SIZE tuning&quot;| W1[&quot;📱 iPhone A\ndot-product loop&quot;]
-    R2 --&gt;|&quot;SSH over VPN\n+ BUFFER_SIZE tuning&quot;| W2[&quot;📱 iPhone B\ndot-product loop&quot;]
-    M --&gt; AGG[&quot;all_sum collective\n(aggregate results)&quot;]
-    W1 --&gt; AGG
-    W2 --&gt; AGG
-    AGG --&gt; OUT[&quot;✅ Final Result\n+ cluster_performance.csv&quot;]
+    MAT["📐 Large Matrix\nWorkload"] --> SPLIT["Master: split\ninto row chunks"]
+    SPLIT --> R0["Chunk → Rank 0"]
+    SPLIT --> R1["Chunk → Rank 1"]
+    SPLIT --> R2["Chunk → Rank 2"]
+    R0 --> M["🖥️ Master Node\nlocal dot-product"]
+    R1 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W1["📱 iPhone A\ndot-product loop"]
+    R2 -->|"SSH over VPN\n+ BUFFER_SIZE tuning"| W2["📱 iPhone B\ndot-product loop"]
+    M --> AGG["all_sum collective\n(aggregate results)"]
+    W1 --> AGG
+    W2 --> AGG
+    AGG --> OUT["✅ Final Result\n+ cluster_performance.csv"]
 </code></pre>
 
 <hr />
@@ -182,11 +182,11 @@ flowchart LR
 
 <pre><code class="language-mermaid">
 flowchart TD
-    S1[&quot;1️⃣ Validate VPN connectivity\nfor all nodes&quot;] --&gt; S2[&quot;2️⃣ Validate SSH connectivity\nand command execution&quot;]
-    S2 --&gt; S3[&quot;3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)&quot;]
-    S3 --&gt; S4[&quot;4️⃣ Run all_sum smoke test\n(small distributed round-trip)&quot;]
-    S4 --&gt; S5[&quot;5️⃣ Scale workload gradually&quot;]
-    S5 --&gt; LOG[&quot;📊 Log metrics\nnetwork time · compute time · wall-clock time&quot;]
+    S1["1️⃣ Validate VPN connectivity\nfor all nodes"] --> S2["2️⃣ Validate SSH connectivity\nand command execution"]
+    S2 --> S3["3️⃣ Run latency / bandwidth\nprobe script (ping_test.py)"]
+    S3 --> S4["4️⃣ Run all_sum smoke test\n(small distributed round-trip)"]
+    S4 --> S5["5️⃣ Scale workload gradually"]
+    S5 --> LOG["📊 Log metrics\nnetwork time · compute time · wall-clock time"]
 </code></pre>
 
 <hr />
@@ -195,7 +195,7 @@ flowchart TD
 
 <h3>Slide 1 — Title</h3>
 
-<p>**Over-the-Internet Distributed Compute Cluster**</p>
+<p><strong>Over-the-Internet Distributed Compute Cluster</strong></p>
 <p>Using Bash orchestration + secure VPN + Python distributed workers.</p>
 
 <h3>Slide 2 — Problem</h3>
@@ -216,7 +216,7 @@ flowchart TD
 
 <h3>Slide 6 — Results and Trade-offs</h3>
 
-<p>Speedup vs communication overhead, with Amdahl&#x27;s Law interpretation.</p>
+<p>Speedup vs communication overhead, with Amdahl's Law interpretation.</p>
 
 <hr />
 
@@ -246,11 +246,11 @@ flowchart TD
 
 <pre><code class="language-bash">
 # 4) Invoke logger and report generator
-if [ -f &quot;./log_metrics.py&quot; ]; then
-  python3 ./log_metrics.py &quot;$WORLD_SIZE&quot; &quot;$MOCK_NET_TIME&quot; &quot;$MOCK_COMP_TIME&quot; &quot;$TOTAL_TIME&quot;
+if [ -f "./log_metrics.py" ]; then
+  python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
 fi
 
-if [ -f &quot;./generate_report.py&quot; ]; then
+if [ -f "./generate_report.py" ]; then
   python3 ./generate_report.py
 fi
 </code></pre>
