@@ -130,7 +130,22 @@ get_local_ipv4s() {
   fi
 
   if command -v ifconfig >/dev/null 2>&1; then
-    ifconfig 2>/dev/null | awk '/inet /{ip=$2; sub(/^addr:/, "", ip); if (ip ~ /^[0-9]+\./) print ip}' | grep -v '^127\.' || true
+    ifconfig 2>/dev/null | awk '
+      /inet / {
+        ip=""
+        for (i = 1; i <= NF; i++) {
+          if ($i == "inet" && (i + 1) <= NF) {
+            ip=$(i + 1)
+          } else if ($i ~ /^addr:/) {
+            split($i, parts, ":")
+            ip=parts[2]
+          }
+        }
+        if (ip ~ /^[0-9]+\./) {
+          print ip
+        }
+      }
+    ' | grep -v '^127\.' || true
     return 0
   fi
 
@@ -161,7 +176,7 @@ resolve_node_ipv4() {
   fi
 
   if command -v python3 >/dev/null 2>&1; then
-    python3 -c "import socket; print(socket.gethostbyname('$candidate'))" 2>/dev/null
+    python3 -c 'import socket, sys; print(socket.gethostbyname(sys.argv[1]))' "$candidate" 2>/dev/null
   fi
 }
 
@@ -365,6 +380,7 @@ if [ "$REQUIRES_MULTI_INTERFACE_BIND" -eq 1 ]; then
   # Bind all interfaces and rely on host firewall/private network controls.
   MASTER_BIND_IP="0.0.0.0"
   echo "ℹ️  Binding master rank to 0.0.0.0 to serve mixed local/VPN worker connectivity."
+  echo "⚠️  Ensure host firewall rules allow trusted LAN/VPN worker sources only."
 fi
 
 MASTER_ADDR=$MASTER_BIND_IP \
