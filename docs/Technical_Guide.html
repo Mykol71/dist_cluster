@@ -105,7 +105,7 @@
     <h2>High-Level Architecture</h2>
 
     <div class="mermaid">
-flowchart TB
+flowchart TD
     subgraph OL["Orchestration Layer"]
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
@@ -265,7 +265,7 @@ flowchart TD
     <p>Adaptive chunk sizing and communication strategy based on measured latency.</p>
 
     <h3>Slide 5 - Execution Flow</h3>
-    <p>Deploy -&gt; profile network -&gt; launch ranks -&gt; compute -&gt; verify -&gt; report.</p>
+    <p>Deploy → profile network → launch ranks → compute → verify → report.</p>
 
     <h3>Slide 6 - Results and Trade-offs</h3>
     <p>Speedup versus communication overhead, with an Amdahl's Law interpretation.</p>

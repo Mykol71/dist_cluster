@@ -14,7 +14,7 @@ Instead of transferring raw VRAM contents across devices, the practical approach
 ## High-Level Architecture
 
 ```mermaid
-flowchart TB
+flowchart TD
     subgraph OL["Orchestration Layer"]
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
@@ -62,11 +62,11 @@ echo "Initializing distributed cluster..."
 
 # 1) Start worker rank 1
 ssh mobile@"$IPHONE_A_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # run in background
 
 # 2) Start worker rank 2
 ssh mobile@"$IPHONE_B_IP" \
-  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &
+  "cd /app && mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &  # run in background
 
 # 3) Start rank 0 on master
 echo "Launching master process..."
