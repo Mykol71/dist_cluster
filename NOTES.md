@@ -219,8 +219,8 @@ For final academic/professional submission, prefer:
 
 ## Next Actions
 
-- [ ] Add SSH hardening guide (`docs/ssh_hardening.md`)
-- [ ] Add latency benchmark script output samples
-- [ ] Add reproducible run command examples
-- [ ] Add failure-handling and retry strategy in orchestration
-- [ ] Add a concise README version of this architecture
+- [x] Add SSH hardening guide (`docs/ssh_hardening.md`)
+- [x] Add latency benchmark script output samples (`docs/latency_benchmark_samples.md`)
+- [x] Add reproducible run command examples (`docs/run_commands.md`)
+- [x] Add failure-handling and retry strategy in orchestration (`run_cluster.sh`)
+- [x] Add a concise README version of this architecture (`README.md`)
