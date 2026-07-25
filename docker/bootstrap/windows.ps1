@@ -7,7 +7,7 @@
 # What this script installs / configures:
 #   1. Winget (checks availability — built-in on Windows 11 / updated Win 10)
 #   2. Docker Desktop with WSL 2 backend
-#   3. Tailscale
+#   3. WireGuard
 #   4. OpenSSH client (for the master role)
 #   5. SSH keypair check
 #   6. Builds the appropriate dist_cluster Docker image
@@ -44,7 +44,7 @@ if (-not $IsWindows -and $env:OS -ne "Windows_NT") {
 # ── 1. Winget availability ─────────────────────────────────────────────────────
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     Warn "winget is not available. Install 'App Installer' from the Microsoft Store and re-run."
-    Warn "Alternatively, install Docker Desktop and Tailscale manually from their websites."
+    Warn "Alternatively, install Docker Desktop and WireGuard manually from their websites."
     Warn "Continuing without winget — manual installation required."
     $NoWinget = $true
 } else {
@@ -78,30 +78,30 @@ try {
     exit 1
 }
 
-# ── 3. Tailscale ───────────────────────────────────────────────────────────────
-$TailscalePath = Get-Command tailscale -ErrorAction SilentlyContinue
+# ── 3. WireGuard ───────────────────────────────────────────────────────────────
+$WgPath = Get-Command wg -ErrorAction SilentlyContinue
 
-if ($TailscalePath) {
-    Ok "Tailscale already installed: $(tailscale version | Select-Object -First 1)"
+if ($WgPath) {
+    Ok "WireGuard already installed: $(wg --version 2>&1 | Select-Object -First 1)"
 } elseif (-not $NoWinget) {
-    Log "Installing Tailscale via winget..."
-    winget install --id Tailscale.Tailscale --accept-package-agreements --accept-source-agreements -e
-    Ok "Tailscale installed."
+    Log "Installing WireGuard via winget..."
+    winget install --id WireGuard.WireGuard --accept-package-agreements --accept-source-agreements -e
+    Ok "WireGuard installed."
 } else {
-    Warn "Please download and install Tailscale from: https://tailscale.com/download/windows"
+    Warn "Please download and install WireGuard from: https://www.wireguard.com/install/"
 }
 
-# Check Tailscale connectivity
+# Check WireGuard interface status
 try {
-    $TsStatus = tailscale status 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Ok "Tailscale is connected."
+    $WgStatus = wg show 2>&1
+    if ($LASTEXITCODE -eq 0 -and $WgStatus) {
+        Ok "WireGuard interface is up."
     } else {
-        Warn "Tailscale is not authenticated. Run: tailscale up"
-        Warn "All cluster nodes must be on the same Tailscale tailnet before running the cluster."
+        Warn "No WireGuard interface is active. Configure a tunnel and bring it up via the WireGuard app."
+        Warn "All cluster nodes must be on the same WireGuard network before running the cluster."
     }
 } catch {
-    Warn "Could not check Tailscale status. Ensure Tailscale is running and authenticated."
+    Warn "Could not check WireGuard status. Ensure WireGuard is installed and a tunnel is configured."
 }
 
 # ── 4. OpenSSH client (master role) ───────────────────────────────────────────
@@ -159,8 +159,8 @@ if ($Role -eq "worker") {
             dist_cluster_worker
         Ok "Worker container started on port 2222."
         Write-Host ""
-        Write-Host "Add this Windows node to the master's WORKER_NODES using its Tailscale IP:"
-        Write-Host "  tailscale ip"
+        Write-Host "Add this Windows node to the master's WORKER_NODES using its WireGuard IP:"
+        Write-Host "  wg show"
         Write-Host "  (configure SSH to use port 2222 in ~/.ssh/config on the master)"
     }
 

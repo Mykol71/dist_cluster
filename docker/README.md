@@ -17,16 +17,16 @@ configure SSH on each worker node, and works identically on **macOS**,
 | `entrypoint-worker.sh` | Injects your SSH public key and starts the SSH daemon inside the worker container |
 | `docker-compose.yml` | Local test cluster — one master + two workers on a shared bridge network |
 | `setup_keys.sh` | Generates the SSH keypair used between master and workers |
-| `bootstrap/linux.sh` | One-shot Linux host setup (Docker Engine + Tailscale) |
-| `bootstrap/macos.sh` | One-shot macOS host setup (Docker Desktop + Tailscale via Homebrew) |
-| `bootstrap/windows.ps1` | One-shot Windows host setup (Docker Desktop + Tailscale via winget) |
+| `bootstrap/linux.sh` | One-shot Linux host setup (Docker Engine + WireGuard) |
+| `bootstrap/macos.sh` | One-shot macOS host setup (Docker Desktop + WireGuard via Homebrew) |
+| `bootstrap/windows.ps1` | One-shot Windows host setup (Docker Desktop + WireGuard via winget) |
 
 ---
 
 ## Option A — Local test cluster (single machine, all OSes)
 
 Spin up a fully functional cluster on one machine using Docker Compose.
-No Tailscale, no SSH key config — everything is wired automatically.
+No WireGuard config required for single-machine use, no SSH key config — everything is wired automatically.
 
 ```bash
 # 1. Generate SSH keypair for the cluster (run once)
@@ -52,7 +52,7 @@ docker compose -f docker/docker-compose.yml down
 ## Option B — Multi-machine cluster (real distributed deployment)
 
 Each physical machine (Mac, Windows PC, Linux box) runs one Docker
-container.  The machines communicate over a **Tailscale** VPN mesh.
+container.  The machines communicate over a **WireGuard** VPN mesh.
 
 ### Step 1 — Bootstrap every node
 
@@ -90,26 +90,34 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 The bootstrap scripts:
 - Install Docker Desktop / Docker Engine
-- Install Tailscale
+- Install WireGuard
 - Generate an SSH keypair (if none exists)
 - Build the appropriate Docker image
 - Start the worker container on **port 2222** (worker role only)
 
-### Step 2 — Connect all nodes to Tailscale
+### Step 2 — Connect all nodes to WireGuard
 
-On each node, sign in to Tailscale:
+On each node, configure and bring up the WireGuard interface:
 
 ```bash
-# Linux / macOS
-sudo tailscale up
+# Linux / macOS — configure /etc/wireguard/wg0.conf, then:
+sudo wg-quick up wg0
 
-# Windows: use the Tailscale system-tray app
+# Windows — add a tunnel via the WireGuard app or:
+# Import a .conf file in the WireGuard tray application
 ```
 
-Note each node's Tailscale IP:
+Note each node's WireGuard IP (set in your wg0.conf `[Interface]` Address):
 
 ```bash
-tailscale ip -4
+# Linux
+ip addr show wg0 | grep 'inet '
+
+# macOS / Linux (via wireguard-tools)
+wg show
+
+# Windows
+wg show
 ```
 
 ### Step 3 — Configure SSH on the master
@@ -118,14 +126,14 @@ Add worker node aliases to `~/.ssh/config` on the master:
 
 ```
 Host worker1
-    HostName <worker1-tailscale-ip>
+    HostName <worker1-wireguard-ip>
     Port 2222
     User root
     IdentityFile ~/.ssh/id_ed25519
     StrictHostKeyChecking no
 
 Host worker2
-    HostName <worker2-tailscale-ip>
+    HostName <worker2-wireguard-ip>
     Port 2222
     User root
     IdentityFile ~/.ssh/id_ed25519
@@ -135,9 +143,9 @@ Host worker2
 Copy the master's public key to each worker:
 
 ```bash
-ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 root@<worker-tailscale-ip>
+ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 root@<worker-wireguard-ip>
 # or, if ssh-copy-id is not available:
-cat ~/.ssh/id_ed25519.pub | ssh -p 2222 root@<worker-tailscale-ip> \
+cat ~/.ssh/id_ed25519.pub | ssh -p 2222 root@<worker-wireguard-ip> \
   "cat >> /root/.ssh/authorized_keys"
 ```
 
@@ -175,7 +183,7 @@ bash run_cluster.sh
 
 | Prerequisite | Why |
 |---|---|
-| Tailscale or WireGuard | VPN connectivity between machines requires host-level networking |
+| WireGuard | VPN connectivity between machines requires host-level networking |
 | Docker Engine / Docker Desktop | The container runtime itself |
 
 ---

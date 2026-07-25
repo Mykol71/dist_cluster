@@ -7,7 +7,7 @@
 #
 # What this script installs / configures:
 #   1. Docker Engine (if not already present)
-#   2. Tailscale (if not already present) — used as the VPN mesh
+#   2. WireGuard (wireguard-tools, if not already present) — used as the VPN mesh
 #   3. SSH key-based auth check
 #   4. Pulls / builds the appropriate dist_cluster Docker image
 #
@@ -105,32 +105,36 @@ else
     install_docker_linux
 fi
 
-# ── 3. Tailscale ─────────────────────────────────────────────────────────────
+# ── 3. WireGuard ─────────────────────────────────────────────────────────────
 
-install_tailscale_linux() {
-    log "Installing Tailscale..."
+install_wireguard_linux() {
+    log "Installing WireGuard..."
     case "$PKG_MGR" in
-        apt|dnf|yum)
-            curl -fsSL https://tailscale.com/install.sh | sh
+        apt)
+            pkg_update
+            pkg_install wireguard-tools
+            ;;
+        dnf|yum)
+            pkg_install wireguard-tools
             ;;
         apk)
-            pkg_install tailscale
+            pkg_install wireguard-tools
             ;;
     esac
-    ok "Tailscale installed."
+    ok "WireGuard installed."
 }
 
-if command -v tailscale &>/dev/null; then
-    ok "Tailscale already installed: $(tailscale version | head -1)"
+if command -v wg &>/dev/null; then
+    ok "WireGuard already installed: $(wg --version 2>&1 | head -1)"
 else
-    install_tailscale_linux
+    install_wireguard_linux
 fi
 
-if tailscale status &>/dev/null; then
-    ok "Tailscale is connected."
+if wg show &>/dev/null 2>&1; then
+    ok "WireGuard interface is up."
 else
-    warn "Tailscale is not authenticated. Run: sudo tailscale up"
-    warn "All cluster nodes must be on the same Tailscale tailnet before running the cluster."
+    warn "No WireGuard interface is active. Configure /etc/wireguard/wg0.conf and run: sudo wg-quick up wg0"
+    warn "All cluster nodes must be on the same WireGuard network before running the cluster."
 fi
 
 # ── 4. SSH key check ──────────────────────────────────────────────────────────
@@ -165,8 +169,8 @@ if [ "$ROLE" = "worker" ]; then
             dist_cluster_worker
         ok "Worker container started on port 2222."
         echo ""
-        echo "Add this node to the master's WORKER_NODES using its Tailscale IP:"
-        echo "  tailscale ip -4"
+        echo "Add this node to the master's WORKER_NODES using its WireGuard IP:"
+        echo "  ip addr show wg0 | grep 'inet '"
         echo "  (and SSH via port 2222 if not using default port)"
     fi
 

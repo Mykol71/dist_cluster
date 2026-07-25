@@ -12,7 +12,7 @@ graph TB
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+        VPN["🔒 Mesh VPN\n(WireGuard)\nEncrypted P2P Tunnel"]
     end
     subgraph CL["Compute Layer"]
         W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
@@ -90,7 +90,7 @@ Key Findings & Performance Scaling
 ```text
 [ Master Node (PC/Mac) ]
        |
-  VPN Tunnel (Tailscale / WireGuard)
+  VPN Tunnel (WireGuard)
        |
   +----+----+
   |         |
@@ -99,7 +99,7 @@ Key Findings & Performance Scaling
 ```
 
 - **Orchestration layer:** Bash scripts manage SSH connections, environment setup, and process lifecycle.
-- **Network layer:** Mesh VPN (Tailscale or WireGuard) provides encrypted peer-to-peer connectivity with stable private IPs.
+- **Network layer:** Mesh VPN (WireGuard) provides encrypted peer-to-peer connectivity with stable private IPs.
 - **Compute layer:** Python worker processes exchange split workload chunks and synchronize via `all_sum` collectives.
 - **Adaptive tuning:** Network latency is profiled before each run to set an optimal packet buffer size.
 
@@ -109,7 +109,7 @@ Key Findings & Performance Scaling
 
 ### Prerequisites
 
-- Tailscale or WireGuard for nodes that are not on the same local network as the orchestrator.
+- WireGuard for nodes that are not on the same local network as the orchestrator.
 - SSH key-based auth configured (see [`docs/ssh_hardening.md`](docs/ssh_hardening.md)).
 - Python 3 + `numpy` (and optionally `mlx`) on all nodes.
 - macOS worker nodes should have either Python 3 preinstalled or Homebrew available so `deploy_cluster.sh` can install it automatically.
@@ -174,7 +174,7 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
 | [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
 | [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX |
-| [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine Tailscale setup |
+| [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine WireGuard setup |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
 

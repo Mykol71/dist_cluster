@@ -19,7 +19,7 @@ flowchart TD
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+        VPN["🔒 Mesh VPN\n(WireGuard)\nEncrypted P2P Tunnel"]
     end
     subgraph CL["Compute Layer"]
         W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
@@ -37,7 +37,7 @@ flowchart TD
 All nodes must be reachable on a common private network.
 
 - Use LAN addressing when workers are on the same local network as the orchestrator (IPv4 families `192.*`, `10.*`, or `172.*`).
-- Use a secure mesh VPN such as Tailscale or WireGuard for workers outside the host's local network.
+- Use a secure mesh VPN such as WireGuard for workers outside the host's local network.
 - Validate connectivity with `ping` and `ssh` before starting distributed jobs.
 
 ---
