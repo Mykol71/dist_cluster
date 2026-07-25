@@ -8,7 +8,7 @@
 # What this script installs / configures:
 #   1. Homebrew (if not already present)
 #   2. Docker Desktop via Homebrew Cask (if not already present)
-#   3. Tailscale via Homebrew Cask (if not already present)
+#   3. WireGuard via Homebrew (wireguard-tools, if not already present)
 #   4. SSH key-based auth check
 #   5. Builds the appropriate dist_cluster Docker image
 #
@@ -84,23 +84,21 @@ else
     done
 fi
 
-# ── 3. Tailscale ─────────────────────────────────────────────────────────────
+# ── 3. WireGuard ─────────────────────────────────────────────────────────────
 
-if command -v tailscale &>/dev/null; then
-    ok "Tailscale already installed: $(tailscale version | head -1)"
+if command -v wg &>/dev/null; then
+    ok "WireGuard already installed: $(wg --version 2>&1 | head -1)"
 else
-    log "Installing Tailscale via Homebrew..."
-    brew install --cask tailscale
-    ok "Tailscale installed."
-    log "Opening Tailscale — complete sign-in in the menu bar app."
-    open -a Tailscale
+    log "Installing WireGuard via Homebrew..."
+    brew install wireguard-tools
+    ok "WireGuard installed."
 fi
 
-if tailscale status &>/dev/null 2>&1; then
-    ok "Tailscale is connected."
+if wg show &>/dev/null 2>&1; then
+    ok "WireGuard interface is up."
 else
-    warn "Tailscale is not authenticated. Open the Tailscale menu-bar app and sign in."
-    warn "All cluster nodes must be on the same Tailscale tailnet before running the cluster."
+    warn "No WireGuard interface is active. Configure /etc/wireguard/wg0.conf and run: sudo wg-quick up wg0"
+    warn "All cluster nodes must be on the same WireGuard network before running the cluster."
 fi
 
 # ── 4. SSH key check ──────────────────────────────────────────────────────────
@@ -135,8 +133,8 @@ if [ "$ROLE" = "worker" ]; then
             dist_cluster_worker
         ok "Worker container started on port 2222."
         echo ""
-        echo "Add this Mac to the master's WORKER_NODES using its Tailscale IP:"
-        echo "  tailscale ip -4"
+        echo "Add this Mac to the master's WORKER_NODES using its WireGuard IP:"
+        echo "  wg show"
         echo "  (configure SSH to use port 2222 in ~/.ssh/config on the master)"
     fi
 

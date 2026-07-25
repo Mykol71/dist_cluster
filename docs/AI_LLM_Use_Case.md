@@ -28,7 +28,7 @@ graph TB
         ORCH["🖥️ Master Node\nModel coordinator\n(run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)"]
+        VPN["🔒 Mesh VPN\n(WireGuard)"]
     end
     subgraph CL["Inference Layer"]
         W1["📱 iPhone A\nLayers 0–15\nMLX inference"]
@@ -76,7 +76,7 @@ workloads:
 
 ### Prerequisites
 
-- All nodes connected via Tailscale or WireGuard (see [`ssh_hardening.md`](ssh_hardening.md)).
+- All nodes connected via WireGuard (see [`ssh_hardening.md`](ssh_hardening.md)).
 - MLX installed on every node: `pip install mlx mlx-lm`.
 - A compatible model downloaded and sharded across node storage (e.g., Llama-3 8B).
 
