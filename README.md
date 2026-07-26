@@ -145,6 +145,7 @@ verify_output.py             # Numerical correctness checks
 log_metrics.py               # Telemetry logging and CSV output
 generate_report.py           # Final Markdown report generation
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
+src/matrix_model.py           # Shared deterministic matrix definitions
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
 docs/ssh_hardening.md        # SSH security hardening guide
 docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
@@ -174,7 +175,6 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
 | [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
 | [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX |
-| [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine WireGuard setup |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
 

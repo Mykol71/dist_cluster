@@ -212,7 +212,7 @@ Append post-run hooks:
 ```bash
 # 4) Invoke logger and report generator
 if [ -f "./log_metrics.py" ]; then
-  python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
+  python3 ./log_metrics.py run_metrics.json
 fi
 
 if [ -f "./generate_report.py" ]; then

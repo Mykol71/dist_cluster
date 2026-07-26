@@ -115,7 +115,7 @@ After a successful run, generate the final summary report:
 python3 verify_output.py
 
 # Log performance metrics
-python3 log_metrics.py 3 0.321 0.142 0.463
+python3 log_metrics.py run_metrics.json
 
 # Generate final Markdown report
 python3 generate_report.py
