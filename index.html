@@ -212,7 +212,7 @@ sequenceDiagram
     <h3>Prerequisites</h3>
     <ul>
       <li>WireGuard for nodes that are not on the same local network as the orchestrator.</li>
-      <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a>).</li>
+      <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.html">docs/ssh_hardening.html</a>).</li>
       <li>Python 3 + <code>numpy</code> on all nodes.</li>
       <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
     </ul>
@@ -227,7 +227,7 @@ sequenceDiagram
     <h3>3. View the report</h3>
     <pre><code>cat FINAL_PROJECT_SUMMARY.md</code></pre>
 
-    <p>For detailed step-by-step commands including smoke tests and troubleshooting, see <a href="docs/run_commands.md">docs/run_commands.md</a>.</p>
+    <p>For detailed step-by-step commands including smoke tests and troubleshooting, see <a href="docs/run_commands.html">docs/run_commands.html</a>.</p>
 
     <hr />
 
@@ -241,9 +241,9 @@ generate_report.py           # Report from measured and verified data
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
 src/matrix_model.py          # Shared deterministic matrix definitions
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
-docs/ssh_hardening.md        # SSH security hardening guide
-docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
-docs/run_commands.md         # Reproducible copy-paste run commands
+docs/ssh_hardening.html      # Pages-ready SSH security hardening guide
+docs/latency_benchmark_samples.html  # Pages-ready latency interpretation
+docs/run_commands.html       # Pages-ready reproducible run commands
 docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pre>
 
     <hr />
@@ -271,9 +271,9 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><th>Document</th><th>Contents</th></tr>
       </thead>
       <tbody>
-        <tr><td><a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a></td><td>Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging</td></tr>
-        <tr><td><a href="docs/latency_benchmark_samples.md">docs/latency_benchmark_samples.md</a></td><td>Sample ping/CSV output and scaling decision table</td></tr>
-        <tr><td><a href="docs/run_commands.md">docs/run_commands.md</a></td><td>Step-by-step reproducible commands for the full workflow</td></tr>
+        <tr><td><a href="docs/ssh_hardening.html">docs/ssh_hardening.html</a></td><td>Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging</td></tr>
+        <tr><td><a href="docs/latency_benchmark_samples.html">docs/latency_benchmark_samples.html</a></td><td>Ping interpretation and receive-buffer decisions</td></tr>
+        <tr><td><a href="docs/run_commands.html">docs/run_commands.html</a></td><td>Step-by-step reproducible commands for the full workflow</td></tr>
         <tr><td><a href="docs/Technical_Guide.html">docs/Technical_Guide.html</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
         <tr><td><a href="docs/AI_LLM_Use_Case.html">docs/AI_LLM_Use_Case.html</a></td><td>AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX</td></tr>
       </tbody>

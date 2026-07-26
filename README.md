@@ -110,7 +110,7 @@ Key Findings & Performance Scaling
 ### Prerequisites
 
 - WireGuard for nodes that are not on the same local network as the orchestrator.
-- SSH key-based auth configured (see [`docs/ssh_hardening.md`](docs/ssh_hardening.md)).
+- SSH key-based auth configured (see [`docs/ssh_hardening.html`](docs/ssh_hardening.html)).
 - Python 3 + `numpy` (and optionally `mlx`) on all nodes.
 - macOS worker nodes should have either Python 3 preinstalled or Homebrew available so `deploy_cluster.sh` can install it automatically.
 
@@ -132,7 +132,7 @@ bash run_cluster.sh
 cat FINAL_PROJECT_SUMMARY.md
 ```
 
-For detailed step-by-step commands including smoke tests and troubleshooting, see [`docs/run_commands.md`](docs/run_commands.md).
+For detailed step-by-step commands including smoke tests and troubleshooting, see [`docs/run_commands.html`](docs/run_commands.html).
 
 ---
 
@@ -147,10 +147,10 @@ generate_report.py           # Final Markdown report generation
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
 src/matrix_model.py           # Shared deterministic matrix definitions
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
-docs/ssh_hardening.md        # SSH security hardening guide
-docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
-docs/run_commands.md         # Reproducible copy-paste run commands
-docs/Technical_Guide.md      # Extended architecture notes and context
+docs/ssh_hardening.html      # Pages-ready SSH security hardening guide
+docs/latency_benchmark_samples.html  # Pages-ready latency interpretation
+docs/run_commands.html       # Pages-ready reproducible run commands
+docs/Technical_Guide.html    # Pages-ready architecture and context
 ```
 
 ---
@@ -170,11 +170,11 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 
 | Document | Contents |
 |----------|----------|
-| [`docs/ssh_hardening.md`](docs/ssh_hardening.md) | Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging |
-| [`docs/latency_benchmark_samples.md`](docs/latency_benchmark_samples.md) | Sample ping/CSV output and scaling decision table |
-| [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
-| [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
-| [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX |
+| [`docs/ssh_hardening.html`](docs/ssh_hardening.html) | Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging |
+| [`docs/latency_benchmark_samples.html`](docs/latency_benchmark_samples.html) | Ping interpretation and receive-buffer decisions |
+| [`docs/run_commands.html`](docs/run_commands.html) | Step-by-step reproducible commands for the full workflow |
+| [`docs/Technical_Guide.html`](docs/Technical_Guide.html) | Extended architecture notes, slide outline, and source quality notes |
+| [`docs/AI_LLM_Use_Case.html`](docs/AI_LLM_Use_Case.html) | AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.
 
