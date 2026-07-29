@@ -1,0 +1,93 @@
+# docker/docker-compose.yml
+#
+# Local test cluster: one master + two worker nodes running as containers.
+#
+# Usage:
+#   1. Generate SSH keys (first time only):
+#        bash docker/setup_keys.sh
+#
+#   2. Start the cluster:
+#        docker compose -f docker/docker-compose.yml up --build -d
+#
+#   3. Run the deployment step (installs deps, syncs src/):
+#        docker compose -f docker/docker-compose.yml exec master \
+#          bash deploy_cluster.sh
+#
+#   4. Run the distributed workload:
+#        docker compose -f docker/docker-compose.yml exec master \
+#          bash run_cluster.sh
+#
+#   5. Tear down:
+#        docker compose -f docker/docker-compose.yml down
+
+services:
+
+  # ── Master Node ─────────────────────────────────────────────────────────────
+  master:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.master
+    container_name: dist_master
+    hostname: master
+    environment:
+      # Override worker node names to match the compose service hostnames
+      - WORKER_NODES=worker1 worker2
+    volumes:
+      # Mount the SSH private key so the master can SSH into workers
+      - ./keys/id_rsa:/root/.ssh/id_rsa:ro
+      - ./keys/id_rsa.pub:/root/.ssh/id_rsa.pub:ro
+      # Persist generated output (CSV, report) back to the host
+      - ../output:/dist_cluster/output
+    networks:
+      - cluster_net
+    depends_on:
+      - worker1
+      - worker2
+    stdin_open: true
+    tty: true
+    # Patch WORKER_NODES in the scripts to use compose service hostnames,
+    # then drop into an interactive shell ready to run the cluster.
+    command: >
+      bash -c "
+        sed -i 's/^WORKER_NODES=.*/WORKER_NODES=(worker1 worker2)/' deploy_cluster.sh run_cluster.sh;
+        echo '✅ Master container ready. Run: bash deploy_cluster.sh && bash run_cluster.sh';
+        exec bash
+      "
+
+  # ── Worker Node 1 (iphoneA equivalent) ──────────────────────────────────────
+  worker1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: dist_worker1
+    hostname: worker1
+    secrets:
+      - ssh_public_key
+    networks:
+      - cluster_net
+    expose:
+      - "22"
+
+  # ── Worker Node 2 (iphoneB equivalent) ──────────────────────────────────────
+  worker2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: dist_worker2
+    hostname: worker2
+    secrets:
+      - ssh_public_key
+    networks:
+      - cluster_net
+    expose:
+      - "22"
+
+# ── Secrets ─────────────────────────────────────────────────────────────────
+secrets:
+  ssh_public_key:
+    file: ./keys/id_rsa.pub
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  cluster_net:
+    driver: bridge

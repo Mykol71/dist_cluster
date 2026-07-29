@@ -95,10 +95,9 @@
     <h2>Overview</h2>
 
     <p>
-      This distributed compute experiment launches workers over SSH and exchanges deterministic
-      matrix chunks over a trusted LAN or WireGuard network. Every application message uses an
-      explicit length-prefixed JSON frame, and the final result is checked against locally
-      recomputed ground truth.
+      This distributed compute experiment coordinates multiple devices over a secure network.
+      Instead of transferring raw VRAM contents across devices, the practical approach is to split
+      model or workload state across nodes and synchronize intermediate results.
     </p>
 
     <hr />
@@ -111,13 +110,13 @@
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Private Network\n(LAN / WireGuard)\nEncrypted remote path"]
+        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
     end
     subgraph CL["Compute Layer"]
         W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
         W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
     end
-    ORCH <-->|"SSH launch + framed JSON"| VPN
+    ORCH <-->|"SSH + Matrix Chunks"| VPN
     VPN <-->|"Private VPN IP"| W1
     VPN <-->|"Private VPN IP"| W2
     </div>
@@ -130,7 +129,7 @@
 
     <ul>
       <li>Use LAN addressing when workers are on the same local network as the orchestrator (IPv4 families <code>192.*</code>, <code>10.*</code>, or <code>172.*</code>).</li>
-      <li>Use WireGuard for workers outside the host's local network.</li>
+      <li>Use a secure mesh VPN such as Tailscale or WireGuard for workers outside the host's local network.</li>
       <li>Validate connectivity with <code>ping</code> and <code>ssh</code> before starting distributed jobs.</li>
     </ul>
 
@@ -143,13 +142,30 @@
     <pre><code>#!/usr/bin/env bash
 set -euo pipefail
 
-# The project scripts perform health checks, choose LAN/WireGuard routes,
-# start every worker rank, and launch rank 0 locally.
-bash deploy_cluster.sh
-bash run_cluster.sh
+# Master address reachable by workers (LAN or VPN)
+MASTER_IP="192.168.1.33"
+IPHONE_A_IP="100.11.22.44"
+IPHONE_B_IP="100.11.22.55"
 
-# Optional reproducibility controls:
-MATRIX_SIZE=600 MATRIX_SEED=20260726 bash run_cluster.sh</code></pre>
+WORLD_SIZE=3   # total processes: rank 0 + two workers
+PORT=8080
+
+echo "Initializing distributed cluster..."
+
+# 1) Start worker rank 1
+ssh mobile@"$IPHONE_A_IP" \
+  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;  # keep worker launches concurrent
+
+# 2) Start worker rank 2
+ssh mobile@"$IPHONE_B_IP" \
+  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;  # keep worker launches concurrent
+
+# 3) Start rank 0 on master
+echo "Launching master process..."
+mx.distributed --world-size "$WORLD_SIZE" --rank 0 --master-addr "$MASTER_IP" --master-port "$PORT" python3 train_dist.py
+
+wait
+echo "Distributed processing finished."</code></pre>
 
     <h3>SSH Notes</h3>
 
@@ -163,19 +179,22 @@ MATRIX_SIZE=600 MATRIX_SEED=20260726 bash run_cluster.sh</code></pre>
 
     <h2>Step 3 - Worker Script (<code>train_dist.py</code>)</h2>
 
-    <p>
-      Rank 0 builds deterministic matrix A, partitions its rows, and sends every worker a
-      framed JSON request. Each worker independently derives the same deterministic matrix B,
-      computes its assigned rows, and returns a framed result plus measured compute time.
-    </p>
+    <p>Each process initializes distributed communication and runs synchronized operations.</p>
 
-    <pre><code># Shared by workers and the verifier:
-A[row, col] = ((row * 17 + col * 31 + seed) % 1000) / 1000
-B[row, col] = ((row * 29 + col * 13 + seed + 97) % 1000) / 1000
+    <pre><code>import mlx.core as mx
 
-# Network payloads are JSON data preceded by an unsigned 8-byte length.
-send_frame(socket, encode_json(message))
-message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
+mx.distributed.init()
+
+rank = mx.distributed.get_rank()
+world_size = mx.distributed.get_world_size()
+
+if rank == 0:
+    print(f"Master node online. World size: {world_size}")
+
+x = mx.array([1.0, 2.0, 3.0]) * (rank + 1)
+sum_x = mx.distributed.all_sum(x)
+
+print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
 
     <h3>Matrix Data-Flow Diagram</h3>
 
@@ -183,16 +202,13 @@ message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
     flowchart LR
         START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
         PING --> CHECK{Latency?}
-        CHECK -->|"Low &lt; 30 ms"| SMALL["256 KB\nreceive chunks"]
-        CHECK -->|"Moderate 30–99 ms"| MEDIUM["1 MB\nreceive chunks"]
-        CHECK -->|"High ≥ 100 ms"| LARGE["2 MB\nreceive chunks"]
+        CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
+        CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
         SMALL --> DIST["Distribute work\nto worker ranks"]
-        MEDIUM --> DIST
         LARGE --> DIST
         DIST --> COMPUTE["Workers compute\ndot-product loops"]
-        COMPUTE --> AGG["Master assembles\nordered row ranges"]
-        AGG --> VERIFY["Full numerical\nground-truth check"]
-        VERIFY --> DONE([✅ Verified result])
+        COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+        AGG --> DONE([✅ Result])
     </div>
 
     <hr />
@@ -202,7 +218,7 @@ message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
     <h3>1) Network Bottleneck</h3>
     <ul>
       <li>Device-local memory bandwidth is much higher than Internet links.</li>
-      <li>Transferring JSON matrix chunks can become communication-bound quickly.</li>
+      <li>Collective operations such as <code>all_sum</code> can become communication-bound quickly.</li>
     </ul>
 
     <h3>2) iOS Background Execution Limits</h3>
@@ -244,13 +260,13 @@ message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
         M->>A: SSH: start worker rank 1
         M->>B: SSH: start worker rank 2
         M->>M: launch rank 0 locally
-        A-->>M: framed result + measured compute time
-        B-->>M: framed result + measured compute time
+        A-->>M: matrix chunk result
+        B-->>M: matrix chunk result
 
         Note over M,B: Phase 4 — Verify & Report
-        M->>M: verify_output.py (full ground-truth comparison)
-        M->>M: log_metrics.py run_metrics.json
-        M->>M: generate_report.py → FINAL_PROJECT_SUMMARY.md
+        M->>M: verify_output.py (delta check)
+        M->>M: log_metrics.py (telemetry)
+        M->>M: generate_report.py → cluster_performance.csv
     </div>
 
     <hr />
@@ -264,7 +280,7 @@ message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
     <p>Single-device memory and compute limits for larger matrix or model workloads.</p>
 
     <h3>Slide 3 - Architecture</h3>
-    <p>Master orchestrator, private network links, remote worker ranks, and framed result assembly.</p>
+    <p>Master orchestrator, private network links, remote worker ranks, and synchronized collectives.</p>
 
     <h3>Slide 4 - Optimization Idea</h3>
     <p>Adaptive chunk sizing and communication strategy based on measured latency.</p>
@@ -288,13 +304,13 @@ message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
       <li>Emit <code>FINAL_PROJECT_SUMMARY.md</code>.</li>
     </ul>
 
-    <h3>Implemented Data-Quality Safeguards</h3>
+    <h3>Recommended Quality Improvements</h3>
     <ul>
-      <li>Rank 0 writes actual transfer, compute, and wall-clock measurements to <code>run_metrics.json</code>.</li>
-      <li>The logger validates the metrics schema and refuses negative or incomplete measurements.</li>
-      <li>Speedup is calculated only when a measured one-node baseline exists.</li>
-      <li>The verifier records pass/fail status and numerical error statistics.</li>
-      <li>Every pipeline stage returns a nonzero exit code when validation fails.</li>
+      <li>Add argument parsing with <code>argparse</code> for log and report paths.</li>
+      <li>Validate CSV schema before reading.</li>
+      <li>Handle malformed numeric fields with guarded parsing.</li>
+      <li>Include min, avg, and max latency plus per-run variance.</li>
+      <li>Add exit codes for CI usage.</li>
     </ul>
 
     <hr />
@@ -305,7 +321,7 @@ message = json.loads(receive_frame(socket).decode("utf-8"))</code></pre>
 
     <pre><code># 4) Invoke logger and report generator
 if [ -f "./log_metrics.py" ]; then
-  python3 ./log_metrics.py run_metrics.json
+  python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
 fi
 
 if [ -f "./generate_report.py" ]; then
@@ -322,7 +338,6 @@ verify_output.py         # numerical correctness checks
 log_metrics.py           # telemetry logging and graph outputs
 generate_report.py       # final markdown report generation
 src/train_dist.py        # distributed compute entrypoint
-src/matrix_model.py      # deterministic matrices shared with verification
 src/ping_test.py         # network latency evaluation</code></pre>
 
     <hr />
@@ -344,9 +359,6 @@ src/ping_test.py         # network latency evaluation</code></pre>
       <li>✅ Add latency benchmark script output samples (<a href="./latency_benchmark_samples.md"><code>docs/latency_benchmark_samples.md</code></a>)</li>
       <li>✅ Add reproducible run command examples (<a href="./run_commands.md"><code>docs/run_commands.md</code></a>)</li>
       <li>✅ Add failure-handling and retry strategy in orchestration (<code>run_cluster.sh</code>)</li>
-      <li>✅ Replace executable network parsing with framed JSON messages</li>
-      <li>✅ Add deterministic full-result numerical verification</li>
-      <li>✅ Replace synthetic telemetry with measured runtime data</li>
       <li>✅ Add a concise README version of this architecture (<code>README.md</code>)</li>
     </ul>
 

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docker Deployment Guide - Distributed Cluster</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.7;
+      color: #e6edf3;
+      background: #0d1117;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    h1 { font-size: 2rem; border-bottom: 2px solid #30363d; padding-bottom: 0.4rem; margin-top: 2rem; }
+    h2 { font-size: 1.5rem; border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; margin-top: 2rem; }
+    h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+
+    p { margin: 0.75rem 0; }
+
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.875em;
+      padding: 0.15em 0.4em;
+    }
+
+    pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    ul, ol { padding-left: 1.5rem; margin: 0.75rem 0; }
+    li { margin: 0.35rem 0; }
+
+    hr { border: none; border-top: 1px solid #30363d; margin: 2rem 0; }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      border: 1px solid #30363d;
+      padding: 0.55rem 0.9rem;
+      text-align: left;
+    }
+
+    th { background: #161b22; font-weight: 600; }
+    tr:nth-child(even) td { background: #161b22; }
+
+    footer {
+      margin-top: 3rem;
+      color: #8b949e;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p><a href="../index.html">← Back to project overview</a></p>
+
+    <h1>dist_cluster — Docker Deployment Guide</h1>
+
+    <p>
+      This directory contains a container-driven implementation of the node installation and
+      configuration described in the top-level <code>README.md</code>. Docker replaces the need
+      to manually install Python&nbsp;3, numpy, and configure SSH on each worker node, and works
+      identically on <strong>macOS</strong>, <strong>Windows</strong>, and <strong>Linux</strong> hosts.
+    </p>
+
+    <hr />
+
+    <h2>How it works</h2>
+
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Dockerfile.worker</code></td><td>Worker node image (Python 3 + numpy + OpenSSH server)</td></tr>
+        <tr><td><code>Dockerfile.master</code></td><td>Master node image (Python 3 + numpy + OpenSSH client + all scripts)</td></tr>
+        <tr><td><code>entrypoint-worker.sh</code></td><td>Injects your SSH public key and starts the SSH daemon inside the worker container</td></tr>
+        <tr><td><code>docker-compose.yml</code></td><td>Local test cluster — one master + two workers on a shared bridge network</td></tr>
+        <tr><td><code>setup_keys.sh</code></td><td>Generates the SSH keypair used between master and workers</td></tr>
+        <tr><td><code>bootstrap/linux.sh</code></td><td>One-shot Linux host setup (Docker Engine + Tailscale)</td></tr>
+        <tr><td><code>bootstrap/macos.sh</code></td><td>One-shot macOS host setup (Docker Desktop + Tailscale via Homebrew)</td></tr>
+        <tr><td><code>bootstrap/windows.ps1</code></td><td>One-shot Windows host setup (Docker Desktop + Tailscale via winget)</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Option A — Local test cluster (single machine, all OSes)</h2>
+
+    <p>
+      Spin up a fully functional cluster on one machine using Docker Compose.
+      No Tailscale, no SSH key config — everything is wired automatically.
+    </p>
+
+    <pre><code># 1. Generate SSH keypair for the cluster (run once)
+bash docker/setup_keys.sh
+
+# 2. Build images and start master + 2 worker containers
+docker compose -f docker/docker-compose.yml up --build -d
+
+# 3. Deploy Python dependencies and sync source files to workers
+docker compose -f docker/docker-compose.yml exec master \
+  bash -c "WORKER_NODES=(worker1 worker2) bash deploy_cluster.sh"
+
+# 4. Run the distributed workload
+docker compose -f docker/docker-compose.yml exec master \
+  bash -c "WORKER_NODES=(worker1 worker2) bash run_cluster.sh"
+
+# 5. Tear down
+docker compose -f docker/docker-compose.yml down</code></pre>
+
+    <hr />
+
+    <h2>Option B — Multi-machine cluster (real distributed deployment)</h2>
+
+    <p>
+      Each physical machine (Mac, Windows PC, Linux box) runs one Docker container.
+      The machines communicate over a <strong>Tailscale</strong> VPN mesh.
+    </p>
+
+    <h3>Step 1 — Bootstrap every node</h3>
+
+    <p>Run the appropriate bootstrap script <strong>once</strong> on each machine:</p>
+
+    <h4>macOS</h4>
+    <pre><code># Worker node
+bash docker/bootstrap/macos.sh --role worker
+
+# Master node
+bash docker/bootstrap/macos.sh --role master</code></pre>
+
+    <h4>Linux</h4>
+    <pre><code># Worker node (run as root or with sudo)
+sudo bash docker/bootstrap/linux.sh --role worker
+
+# Master node
+sudo bash docker/bootstrap/linux.sh --role master</code></pre>
+
+    <h4>Windows (elevated PowerShell)</h4>
+    <pre><code># Allow script execution for this session
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# Worker node
+.\docker\bootstrap\windows.ps1 -Role worker
+
+# Master node
+.\docker\bootstrap\windows.ps1 -Role master</code></pre>
+
+    <p>The bootstrap scripts:</p>
+    <ul>
+      <li>Install Docker Desktop / Docker Engine</li>
+      <li>Install Tailscale</li>
+      <li>Generate an SSH keypair (if none exists)</li>
+      <li>Build the appropriate Docker image</li>
+      <li>Start the worker container on <strong>port 2222</strong> (worker role only)</li>
+    </ul>
+
+    <h3>Step 2 — Connect all nodes to Tailscale</h3>
+
+    <p>On each node, sign in to Tailscale:</p>
+
+    <pre><code># Linux / macOS
+sudo tailscale up
+
+# Windows: use the Tailscale system-tray app</code></pre>
+
+    <p>Note each node's Tailscale IP:</p>
+
+    <pre><code>tailscale ip -4</code></pre>
+
+    <h3>Step 3 — Configure SSH on the master</h3>
+
+    <p>Add worker node aliases to <code>~/.ssh/config</code> on the master:</p>
+
+    <pre><code>Host worker1
+    HostName &lt;worker1-tailscale-ip&gt;
+    Port 2222
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking no
+
+Host worker2
+    HostName &lt;worker2-tailscale-ip&gt;
+    Port 2222
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking no</code></pre>
+
+    <p>Copy the master's public key to each worker:</p>
+
+    <pre><code>ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 root@&lt;worker-tailscale-ip&gt;
+# or, if ssh-copy-id is not available:
+cat ~/.ssh/id_ed25519.pub | ssh -p 2222 root@&lt;worker-tailscale-ip&gt; \
+  "cat >> /root/.ssh/authorized_keys"</code></pre>
+
+    <h3>Step 4 — Update <code>WORKER_NODES</code> in the cluster scripts</h3>
+
+    <p>Edit <code>deploy_cluster.sh</code> and <code>run_cluster.sh</code> to reference your worker host aliases:</p>
+
+    <pre><code>WORKER_NODES=("worker1" "worker2")</code></pre>
+
+    <h3>Step 5 — Deploy and run</h3>
+
+    <p>From the master node (inside the master container, or natively if you ran <code>--role master</code>):</p>
+
+    <pre><code>bash deploy_cluster.sh
+bash run_cluster.sh</code></pre>
+
+    <hr />
+
+    <h2>Prerequisites handled automatically by Docker</h2>
+
+    <table>
+      <thead>
+        <tr><th>README prerequisite</th><th>How Docker handles it</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Python 3 on all nodes</td><td>Built into the container image</td></tr>
+        <tr><td><code>numpy</code> (and optionally <code>mlx</code>)</td><td>Installed via <code>pip</code> in the Dockerfile</td></tr>
+        <tr><td>SSH key-based auth on workers</td><td><code>entrypoint-worker.sh</code> injects the public key at container start</td></tr>
+        <tr><td>Homebrew / system Python on macOS</td><td>Not needed — Docker provides the environment</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Prerequisites still required on the host</h2>
+
+    <table>
+      <thead>
+        <tr><th>Prerequisite</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Tailscale or WireGuard</td><td>VPN connectivity between machines requires host-level networking</td></tr>
+        <tr><td>Docker Engine / Docker Desktop</td><td>The container runtime itself</td></tr>
+      </tbody>
+    </table>
+
+    <hr />
+
+    <h2>Customisation</h2>
+
+    <h3>Add more workers</h3>
+
+    <p>
+      Add services to <code>docker-compose.yml</code> following the <code>worker1</code>/<code>worker2</code>
+      pattern, then update <code>WORKER_NODES</code> in the master <code>command:</code> block.
+    </p>
+
+    <h3>Use <code>mlx</code> on Apple Silicon</h3>
+
+    <p>Change the pip install line in <code>Dockerfile.worker</code>:</p>
+
+    <pre><code>RUN pip install --no-cache-dir numpy mlx</code></pre>
+
+    <h3>Persist output files</h3>
+
+    <p>
+      The master service in <code>docker-compose.yml</code> mounts <code>../output</code> for CSV
+      and report files. Create the directory first:
+    </p>
+
+    <pre><code>mkdir -p output</code></pre>
+
+    <footer>
+      <a href="mailto:mgreen@mykol.com">mgreen@mykol.com</a>
+    </footer>
+  </div>
+</body>
+</html>

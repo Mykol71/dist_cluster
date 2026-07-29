@@ -101,10 +101,9 @@
     <h1>Distributed Compute Cluster</h1>
 
     <p>
-      An experimental distributed compute cluster that coordinates iPhones, Macs, and other
-      SSH-reachable nodes across a local network or WireGuard mesh. SSH launches each worker;
-      length-prefixed JSON frames carry deterministic matrix chunks and results over the trusted
-      private network.
+      An experimental over-the-Internet distributed compute cluster that coordinates multiple devices
+      (iPhones, Macs, and other SSH-reachable nodes) over SSH across either a local network or a VPN mesh. Workloads are split across nodes,
+      processed in parallel, and results are synchronized using Python-based collective operations.
     </p>
 
     <hr />
@@ -117,13 +116,13 @@ graph TB
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Private Network\n(LAN / WireGuard)\nEncrypted remote path"]
+        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
     end
     subgraph CL["Compute Layer"]
         W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
         W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
     end
-    ORCH <-->|"SSH launch + framed JSON"| VPN
+    ORCH <-->|"SSH + Matrix Chunks"| VPN
     VPN <-->|"Private VPN IP"| W1
     VPN <-->|"Private VPN IP"| W2
     </div>
@@ -133,25 +132,21 @@ graph TB
     <ul>
       <li><strong>The Network Bottleneck:</strong> Internet routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.</li>
       <li><strong>Dynamic Packet Tuning:</strong> An automated network ping test executes right before data distribution.</li>
-      <li><strong>Low Latency (&lt;30 ms):</strong> Uses responsive 256&nbsp;KB receive chunks.</li>
-      <li><strong>Moderate Latency (30–99 ms):</strong> Uses 1&nbsp;MB receive chunks.</li>
-      <li><strong>High Latency (≥100 ms or unreachable):</strong> Uses 2&nbsp;MB receive chunks.</li>
+      <li><strong>Low Latency (Wi-Fi):</strong> Drops down to responsive 256&nbsp;KB packet chunks.</li>
+      <li><strong>High Latency (Cellular/LTE):</strong> Automatically scales to large 2&nbsp;MB streaming data blocks to maximize throughput.</li>
     </ul>
 
     <div class="mermaid">
 flowchart LR
     START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
     PING --> CHECK{Latency?}
-    CHECK -->|"Low &lt; 30 ms"| SMALL["256 KB\nreceive chunks"]
-    CHECK -->|"Moderate 30–99 ms"| MEDIUM["1 MB\nreceive chunks"]
-    CHECK -->|"High ≥ 100 ms"| LARGE["2 MB\nreceive chunks"]
+    CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
+    CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
     SMALL --> DIST["Distribute work\nto worker ranks"]
-    MEDIUM --> DIST
     LARGE --> DIST
     DIST --> COMPUTE["Workers compute\ndot-product loops"]
-    COMPUTE --> AGG["Master assembles\nordered row ranges"]
-    AGG --> VERIFY["Recompute deterministic\nground truth"]
-    VERIFY --> DONE([✅ Verified Result])
+    COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+    AGG --> DONE([✅ Result])
     </div>
 
     <h2>Technical Execution Workflow</h2>
@@ -159,10 +154,8 @@ flowchart LR
     <ul>
       <li><strong>Deployment:</strong> <code>deploy_cluster.sh</code> uses parallel background tasks to sync code, detect operating systems (iSH Alpine vs Native iOS), and configure dependencies automatically.</li>
       <li><strong>Profiling:</strong> <code>run_cluster.sh</code> benchmarks connection latencies and starts remote background worker ranks over SSH.</li>
-      <li><strong>Transport:</strong> An explicit 8-byte length header frames every JSON message; network data is parsed as data and is never executed as Python.</li>
-      <li><strong>Calculation:</strong> Every rank derives the same matrix inputs from a shared seed, while workers compute disjoint row ranges concurrently.</li>
-      <li><strong>Verification:</strong> The complete output is recomputed locally and compared element by element with configurable numerical tolerances.</li>
-      <li><strong>Measurement:</strong> Rank 0 records actual transfer, slowest-worker compute, and wall-clock durations in <code>run_metrics.json</code>.</li>
+      <li><strong>Calculation:</strong> Workers stream data chunks, process heavy dot-product row loops inside their hardware memory pools, and return calculations.</li>
+      <li><strong>Verification:</strong> The master node aggregates chunks, renders progress bars, saves a final unified <code>.csv</code> report, and engages mathematical delta checkers.</li>
     </ul>
 
     <div class="mermaid">
@@ -188,21 +181,20 @@ sequenceDiagram
     M->>A: SSH: start worker rank 1
     M->>B: SSH: start worker rank 2
     M->>M: launch rank 0 locally
-    A-->>M: framed JSON result + measured compute time
-    B-->>M: framed JSON result + measured compute time
+    A-->>M: matrix chunk result
+    B-->>M: matrix chunk result
 
     Note over M,B: Phase 4 — Verify & Report
-    M->>M: verify_output.py (full ground-truth comparison)
-    M->>M: log_metrics.py run_metrics.json
-    M->>M: generate_report.py → FINAL_PROJECT_SUMMARY.md
+    M->>M: verify_output.py (delta check)
+    M->>M: log_metrics.py (telemetry)
+    M->>M: generate_report.py → cluster_performance.csv
     </div>
 
     <h2>Key Findings &amp; Performance Scaling</h2>
 
     <ul>
-      <li><strong>Compute vs. Network Cost:</strong> The measured report separates transfer time, the slowest worker's compute time, and total wall-clock time.</li>
+      <li><strong>Compute vs. Network Cost:</strong> iPhone hardware handles local matrix multiplication instantly, but internet bandwidth limits linear speedup scaling.</li>
       <li><strong>Amdahl's Law in Action:</strong> The project illustrates how a slower communication layer introduces parallel overhead, demonstrating real-world high-performance computing (HPC) constraints.</li>
-      <li><strong>Evidence before claims:</strong> Speedup is reported only after a one-node baseline exists; no synthetic benchmark data is generated.</li>
     </ul>
 
     <hr />
@@ -211,9 +203,9 @@ sequenceDiagram
 
     <h3>Prerequisites</h3>
     <ul>
-      <li>WireGuard for nodes that are not on the same local network as the orchestrator.</li>
+      <li>Tailscale or WireGuard for nodes that are not on the same local network as the orchestrator.</li>
       <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a>).</li>
-      <li>Python 3 + <code>numpy</code> on all nodes.</li>
+      <li>Python 3 + <code>numpy</code> (and optionally <code>mlx</code>) on all nodes.</li>
       <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
     </ul>
     <p><code>run_cluster.sh</code> is local-network aware for IPv4 ranges that start with <code>192.*</code>, <code>10.*</code>, or <code>172.*</code> (project first-octet rule, including all <code>172.*</code>). If a worker is on the same local network family as the host, it uses the host LAN IP and does not require VPN host configuration. For mixed LAN-local and VPN-only workers in one run, set <code>ALLOW_MASTER_WILDCARD_BIND=1</code> so rank 0 can bind on <code>0.0.0.0</code>.</p>
@@ -236,10 +228,9 @@ sequenceDiagram
     <pre><code>deploy_cluster.sh            # Node provisioning: connectivity, packages, file sync
 run_cluster.sh               # Orchestration: latency profile, spawn workers, cleanup
 verify_output.py             # Numerical correctness checks
-log_metrics.py               # Persist measured telemetry
-generate_report.py           # Report from measured and verified data
+log_metrics.py               # Telemetry logging and CSV output
+generate_report.py           # Final Markdown report generation
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
-src/matrix_model.py          # Shared deterministic matrix definitions
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
 docs/ssh_hardening.md        # SSH security hardening guide
 docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
@@ -255,7 +246,7 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><th>Constraint</th><th>Description</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Network bottleneck</strong></td><td>Internet latency is much higher than local interconnects; transferring matrix chunks can become communication-bound quickly.</td></tr>
+        <tr><td><strong>Network bottleneck</strong></td><td>Internet latency is much higher than local interconnects; collective ops become communication-bound quickly.</td></tr>
         <tr><td><strong>iOS background limits</strong></td><td>iOS may suspend background terminal sessions; keep the screen active during runs.</td></tr>
         <tr><td><strong>WAN jitter</strong></td><td>Packet loss and jitter cause straggler ranks; the orchestrator retries SSH connections and aborts on persistent failure.</td></tr>
         <tr><td><strong>Amdahl's Law</strong></td><td>Communication overhead grows with node count; speedup tapers off beyond a small cluster size.</td></tr>
@@ -276,6 +267,7 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><td><a href="docs/run_commands.md">docs/run_commands.md</a></td><td>Step-by-step reproducible commands for the full workflow</td></tr>
         <tr><td><a href="docs/Technical_Guide.html">docs/Technical_Guide.html</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
         <tr><td><a href="docs/AI_LLM_Use_Case.html">docs/AI_LLM_Use_Case.html</a></td><td>AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX</td></tr>
+        <tr><td><a href="docs/Docker_Deployment_Guide.html">docs/Docker_Deployment_Guide.html</a></td><td>Container-driven deployment guide: local test cluster and multi-machine Tailscale setup</td></tr>
       </tbody>
     </table>
 
