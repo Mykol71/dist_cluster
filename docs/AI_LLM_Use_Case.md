@@ -76,7 +76,7 @@ workloads:
 
 ### Prerequisites
 
-- All nodes connected via WireGuard (see [`ssh_hardening.html`](ssh_hardening.html)).
+- All nodes connected via WireGuard (see [`ssh_hardening.md`](ssh_hardening.md)).
 - MLX installed on every node: `pip install mlx mlx-lm`.
 - A compatible model downloaded and sharded across node storage (e.g., Llama-3 8B).
 
@@ -165,9 +165,9 @@ sequenceDiagram
 
 | Document | Contents |
 |----------|----------|
-| [`ssh_hardening.html`](ssh_hardening.html) | Securing SSH access across WireGuard nodes |
-| [`latency_benchmark_samples.html`](latency_benchmark_samples.html) | Ping interpretation and buffer-size decisions |
-| [`run_commands.html`](run_commands.html) | Reproducible commands for the full workflow |
-| [`Technical_Guide.html`](Technical_Guide.html) | Extended architecture notes |
+| [`ssh_hardening.md`](ssh_hardening.md) | Securing SSH access across VPN nodes |
+| [`latency_benchmark_samples.md`](latency_benchmark_samples.md) | Ping/CSV output and buffer-size decisions |
+| [`run_commands.md`](run_commands.md) | Reproducible commands for the full workflow |
+| [`Technical_Guide.md`](Technical_Guide.md) | Extended architecture notes |
 
 mgreen@mykol.com

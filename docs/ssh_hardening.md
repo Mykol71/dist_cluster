@@ -2,7 +2,7 @@
 
 This guide covers practical SSH hardening steps for the distributed cluster project.
 All nodes (master and worker iPhones/devices) should follow these recommendations before
-running experiments over a WireGuard mesh.
+running experiments over a VPN mesh.
 
 > ⚠️ **Safety note:** Always keep a second terminal session open (or a console/recovery path)
 > before making changes to SSH configuration. Test the new settings with a fresh connection
@@ -21,14 +21,14 @@ ssh-keygen -t ed25519 -C "dist_cluster_orchestrator" -f ~/.ssh/dist_cluster_id
 Copy the public key to each worker node:
 
 ```bash
-ssh-copy-id -i ~/.ssh/dist_cluster_id.pub mobile@10.42.0.2   # worker A
-ssh-copy-id -i ~/.ssh/dist_cluster_id.pub mobile@10.42.0.3   # worker B
+ssh-copy-id -i ~/.ssh/dist_cluster_id.pub mobile@100.11.22.44   # iPhone A
+ssh-copy-id -i ~/.ssh/dist_cluster_id.pub mobile@100.11.22.55   # iPhone B
 ```
 
 Verify key login works before disabling password auth:
 
 ```bash
-ssh -i ~/.ssh/dist_cluster_id mobile@10.42.0.2 echo "key login OK"
+ssh -i ~/.ssh/dist_cluster_id mobile@100.11.22.44 echo "key login OK"
 ```
 
 ---
@@ -62,13 +62,13 @@ Bind `sshd` to the VPN interface only so SSH is not exposed on the public interf
 In `/etc/ssh/sshd_config` set:
 
 ```
-ListenAddress 10.42.0.2   # replace with each node's WireGuard IP
+ListenAddress 100.11.22.44   # replace with each node's VPN IP
 ```
 
 Alternatively, use `Match Address` to restrict accepted clients to the VPN subnet:
 
 ```
-AllowUsers mobile@10.42.0.*
+AllowUsers mobile@100.11.22.*
 ```
 
 Reload `sshd` after the change.
@@ -138,12 +138,12 @@ iptables -A INPUT -p tcp --dport 22 -m state --state NEW \
 
 ## 6. Firewall Allow-Listing to VPN Subnet
 
-Only accept SSH traffic from the WireGuard subnet (`10.42.0.0/24` in these examples).
+Only accept SSH traffic from the VPN subnet (`100.11.22.0/24` in these examples).
 All other SSH traffic should be dropped:
 
 ```bash
 # Allow SSH from VPN subnet only
-iptables -A INPUT -p tcp --dport 22 -s 10.42.0.0/24 -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -s 100.11.22.0/24 -j ACCEPT
 # Drop all other inbound SSH
 iptables -A INPUT -p tcp --dport 22 -j DROP
 ```
