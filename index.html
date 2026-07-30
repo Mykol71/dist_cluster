@@ -266,13 +266,16 @@ docker compose -f docker/docker-compose.yml down</code></pre>
 
     <pre><code>deploy_cluster.sh            # Node provisioning: connectivity, packages, file sync
 run_cluster.sh               # Orchestration: latency profile, spawn workers, cleanup
+run_llm_cluster.sh           # MLX-LM pipeline inference on Apple Silicon Macs
 verify_output.py             # Numerical correctness checks
 log_metrics.py               # Telemetry logging and CSV output
 generate_report.py           # Final Markdown report generation
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
 tests/test_local_cluster.py  # Local master/two-worker protocol smoke test
+tests/test_llm_workflow.py   # MLX-LM command-construction smoke test
 requirements.txt             # Python runtime dependencies
+requirements-llm.txt         # Mac-only MLX-LM dependency
 docker/                      # Reproducible local Docker cluster
 docs/ssh_hardening.md        # SSH security hardening guide
 docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
@@ -308,7 +311,7 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><td><a href="docs/latency_benchmark_samples.html">Latency profiling guide</a></td><td>Ping output, admission policy, and buffer-size decisions</td></tr>
         <tr><td><a href="docs/run_commands.html">Reproducible run commands</a></td><td>Step-by-step commands for the full workflow</td></tr>
         <tr><td><a href="docs/Technical_Guide.html">docs/Technical_Guide.html</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
-        <tr><td><a href="docs/AI_LLM_Use_Case.html">docs/AI_LLM_Use_Case.html</a></td><td>AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX</td></tr>
+        <tr><td><a href="docs/AI_LLM_Use_Case.html">Executable MLX-LM workflow</a></td><td>Runnable local, ring, and JACCL pipeline inference on Apple Silicon Macs</td></tr>
         <tr><td><a href="docs/Docker_Deployment_Guide.html">docs/Docker_Deployment_Guide.html</a></td><td>Container-driven deployment guide: local test cluster and manual multi-machine WireGuard setup</td></tr>
       </tbody>
     </table>

@@ -148,6 +148,29 @@ python3 tests/test_local_cluster.py
 
 For detailed step-by-step commands including smoke tests and troubleshooting, see [`docs/run_commands.md`](docs/run_commands.md).
 
+### Apple Silicon LLM workflow
+
+MLX-LM performs the model-aware pipeline sharding, so this project does not
+need a separate `shard_model.py`. Install the Mac-only dependency and run a
+two-rank inference workflow:
+
+```bash
+python3 -m pip install -r requirements-llm.txt
+bash run_llm_cluster.sh \
+  --local-ranks 2 \
+  --prompt "Explain pipeline parallelism in three sentences."
+```
+
+Validate command construction on any platform without installing MLX or
+downloading a model:
+
+```bash
+python3 tests/test_llm_workflow.py
+```
+
+See [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) for remote ring and
+JACCL hostfile examples.
+
 ---
 
 ## File Structure
@@ -155,6 +178,7 @@ For detailed step-by-step commands including smoke tests and troubleshooting, se
 ```
 deploy_cluster.sh            # Node provisioning: connectivity, packages, file sync
 run_cluster.sh               # Orchestration: latency profile, spawn workers, cleanup
+run_llm_cluster.sh           # MLX-LM pipeline inference on Apple Silicon Macs
 verify_output.py             # Numerical correctness checks
 log_metrics.py               # Telemetry logging and CSV output
 generate_report.py           # Final Markdown report generation
@@ -164,6 +188,7 @@ docs/ssh_hardening.md        # SSH security hardening guide
 docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
 docs/run_commands.md         # Reproducible copy-paste run commands
 docs/Technical_Guide.md      # Extended architecture notes and context
+requirements-llm.txt         # Mac-only MLX-LM dependency
 ```
 
 ---
@@ -187,7 +212,7 @@ docs/Technical_Guide.md      # Extended architecture notes and context
 | [`docs/latency_benchmark_samples.md`](docs/latency_benchmark_samples.md) | Sample ping/CSV output and scaling decision table |
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
 | [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
-| [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX |
+| [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | Executable MLX-LM pipeline inference, including local, ring, and JACCL workflows |
 | [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine WireGuard setup |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.

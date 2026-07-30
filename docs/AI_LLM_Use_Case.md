@@ -1,175 +1,134 @@
-# AI LLM Use Case — Distributed Cluster Inference
+# Executable MLX-LM Pipeline Inference
 
-This document describes how the distributed compute cluster can be extended to run
-large language model (LLM) inference across multiple Apple Silicon devices using
-**MLX** and the existing VPN mesh infrastructure.
+This project includes `run_llm_cluster.sh`, an executable workflow for
+pipeline-parallel text generation with MLX-LM on Apple Silicon Macs.
 
----
+> This is separate from the portable NumPy matrix workflow. MLX-LM requires
+> Apple Silicon and does not run in the project's Linux Docker smoke cluster.
+> The Python MLX workflow targets Macs, not iPhone terminal environments.
 
-## Overview
+MLX-LM already performs model-aware sharding. In distributed mode,
+`mlx_lm.chat --pipeline` uses `sharded_load`, assigns consecutive model layers
+to pipeline ranks, and downloads only the converted weight files needed by each
+rank. A custom `shard_model.py` is therefore neither required nor included.
 
-Modern LLMs are too large to fit in the memory of a single consumer device.  A
-distributed approach splits the model layers across several nodes, pipelines token
-generation, and aggregates results back on the master node — all over the encrypted
-VPN mesh that already powers this cluster.
+## Requirements
 
-> **Key insight:** Apple Silicon iPhones and Macs share CPU/GPU memory in a unified
-> memory architecture (UMA).  MLX is purpose-built to exploit this, making
-> device-local token generation fast.  The cluster turns that per-device speed into
-> collective inference capacity.
-
----
-
-## Architecture
-
-```mermaid
-graph TB
-    subgraph OL["Orchestration Layer"]
-        ORCH["🖥️ Master Node\nModel coordinator\n(run_cluster.sh)"]
-    end
-    subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(WireGuard)"]
-    end
-    subgraph CL["Inference Layer"]
-        W1["📱 iPhone A\nLayers 0–15\nMLX inference"]
-        W2["📱 iPhone B\nLayers 16–31\nMLX inference"]
-    end
-    ORCH <-->|"Prompt + KV cache shards"| VPN
-    VPN <-->|"Hidden states / logits"| W1
-    VPN <-->|"Hidden states / logits"| W2
-```
-
----
-
-## Pipeline Strategy
-
-LLM inference is split using **pipeline parallelism**: each worker node owns a
-consecutive slice of the model's transformer layers.  The activation tensor from the
-last layer of one shard is forwarded to the next node over the VPN.
-
-```mermaid
-flowchart LR
-    PROMPT([📝 User Prompt]) --> TOK["Tokenize\n(master)"]
-    TOK --> W1["iPhone A\nLayers 0–15"]
-    W1 -->|"Hidden state"| W2["iPhone B\nLayers 16–31"]
-    W2 -->|"Final logits"| SAMPLE["Sample / decode\n(master)"]
-    SAMPLE --> TOKEN([🔤 Next token])
-    TOKEN -->|"Append & loop"| TOK
-```
-
----
-
-## Adaptive Packet Sizing for LLM Payloads
-
-Hidden-state tensors are large (sequence × hidden-dim × dtype bytes).  The existing
-`ping_test.py` latency probe drives the same adaptive buffer logic used for matrix
-workloads:
-
-| Condition | Buffer size | Rationale |
-|-----------|-------------|-----------|
-| `< 30 ms`, mdev `< 10`, `0%` loss | 256 KB chunks | Minimize per-token round-trip |
-| `30–80 ms`, mdev `≤ 40`, `0%` loss | 1 MB chunks | Balance responsiveness and overhead |
-| `80–150 ms`, loss `< 1%` | 2 MB blocks | Proceed cautiously |
-| `> 150 ms` or loss `> 2%` | Abort | Repair and re-profile the link |
-
----
-
-## Setup
-
-### Prerequisites
-
-- All nodes connected via WireGuard (see [`ssh_hardening.md`](ssh_hardening.md)).
-- MLX installed on every node: `pip install mlx mlx-lm`.
-- A compatible model downloaded and sharded across node storage (e.g., Llama-3 8B).
-
-### 1. Shard the model weights
+On every participating Mac:
 
 ```bash
-# On master — split a Hugging Face checkpoint into per-node layer slices
-python3 src/shard_model.py \
-  --model-path ./models/llama3-8b \
-  --num-shards 2 \
-  --output-dir ./shards
+python3 -m pip install -r requirements-llm.txt
+mlx_lm.chat --help
 ```
 
-### 2. Sync shards to worker nodes
+For remote execution:
+
+- Passwordless SSH between the launch Mac and every host.
+- The same Python/MLX-LM environment available on every host.
+- A valid MLX hostfile.
+- Ring-reachable IP addresses over LAN, WireGuard, or a configured Thunderbolt
+  ring; alternatively, a JACCL hostfile for a supported Thunderbolt RDMA mesh.
+
+See the official [MLX distributed communication guide](https://ml-explore.github.io/mlx/build/html/usage/distributed.html)
+and [MLX-LM project](https://github.com/ml-explore/mlx-lm).
+
+## Local executable check
+
+Run two pipeline ranks on one Apple Silicon Mac:
 
 ```bash
-bash deploy_cluster.sh   # existing deploy script handles rsync to each node
+bash run_llm_cluster.sh \
+  --local-ranks 2 \
+  --model mlx-community/Llama-3.2-3B-Instruct-4bit \
+  --prompt "Explain pipeline parallelism in three sentences." \
+  --max-tokens 128
 ```
 
-### 3. Start the inference cluster
+The response is saved to `output/llm_response.txt`.
+
+Use `--dry-run` to validate argument construction without MLX or model weights:
 
 ```bash
-bash run_cluster.sh --mode llm --prompt "Explain pipeline parallelism."
+bash run_llm_cluster.sh --dry-run --local-ranks 2 --prompt "Hello"
 ```
 
----
+## Remote ring workflow
 
-## Execution Workflow
+Create an MLX ring hostfile. Each entry identifies the SSH alias and the IP on
+which that rank participates in the ring:
 
-```mermaid
-sequenceDiagram
-    participant M as 🖥️ Master Node
-    participant A as 📱 iPhone A (Layers 0–15)
-    participant B as 📱 iPhone B (Layers 16–31)
-
-    Note over M,B: Phase 1 — Deploy model shards
-    M->>A: rsync shards/0/ → /app/model/
-    M->>B: rsync shards/1/ → /app/model/
-    A-->>M: ✅ shard ready
-    B-->>M: ✅ shard ready
-
-    Note over M,B: Phase 2 — Profile network
-    M->>A: ping_test.py → buffer recommendation
-    M->>B: ping_test.py → buffer recommendation
-    M->>M: set OPTIMAL_BUFFER
-
-    Note over M,B: Phase 3 — Autoregressive inference loop
-    M->>A: input_ids (tokenized prompt)
-    A->>B: hidden_states after layer 15
-    B->>M: logits from layer 31
-    M->>M: sample next token
-    M->>A: updated KV cache + next token
-    Note over M,B: Repeat until EOS or max_tokens
-
-    Note over M,B: Phase 4 — Report
-    M->>M: log_metrics.py (tokens/sec, latency)
-    M->>M: generate_report.py → llm_performance.csv
+```json
+[
+  {"ssh": "mac1", "ips": ["10.10.0.1"]},
+  {"ssh": "mac2", "ips": ["10.10.0.2"]}
+]
 ```
 
----
+Then launch:
 
-## Performance Considerations
+```bash
+bash run_llm_cluster.sh \
+  --hostfile cluster-ring.json \
+  --backend ring \
+  --model mlx-community/Llama-3.2-3B-Instruct-4bit \
+  --prompt "Explain pipeline parallelism in three sentences." \
+  --max-tokens 128
+```
 
-| Factor | Impact |
-|--------|--------|
-| **Model size** | Larger models benefit more from distribution; small models may be faster on a single device. |
-| **Sequence length** | Longer contexts increase hidden-state transfer size each step. |
-| **Network latency** | Each forward pass incurs one full round-trip between shards; Wi-Fi strongly preferred. |
-| **Apple Silicon UMA** | No CPU↔GPU copy overhead; each node's GPU and CPU share the same memory pool. |
-| **Amdahl's Law** | Communication overhead grows with shard count; 2–3 nodes is typically optimal for consumer hardware. |
+Before launch, the script applies the project's latency, jitter, and packet-loss
+admission policy to every remote host. Any rejected link aborts before model
+loading. Use `--skip-latency-check` only when ICMP is intentionally unavailable
+and the transport has been validated separately.
 
----
+## JACCL workflow
 
-## Known Constraints
+On supported Macs with a fully connected Thunderbolt RDMA mesh, generate a
+JACCL hostfile using the official MLX helper:
 
-| Constraint | Description |
-|------------|-------------|
-| **iOS background limits** | iOS may suspend long-running inference jobs; keep the display active. |
-| **WAN jitter** | Token latency spikes when the hidden-state transfer stalls; the orchestrator retries on timeout. |
-| **KV cache size** | Each node caches only its own layers; the master coordinates cache consistency. |
-| **Model compatibility** | Only models with clean layer-wise APIs (HuggingFace / MLX) are straightforward to shard. |
+```bash
+mlx.distributed_config --verbose \
+  --hosts mac1,mac2 \
+  --over thunderbolt \
+  --backend jaccl \
+  --auto-setup \
+  --output cluster-jaccl.json
 
----
+bash run_llm_cluster.sh \
+  --hostfile cluster-jaccl.json \
+  --backend jaccl \
+  --model mlx-community/Llama-3.2-3B-Instruct-4bit
+```
 
-## Related Documents
+Without `--prompt`, the workflow opens the interactive MLX-LM chat interface.
 
-| Document | Contents |
-|----------|----------|
-| [`ssh_hardening.md`](ssh_hardening.md) | Securing SSH access across VPN nodes |
-| [`latency_benchmark_samples.md`](latency_benchmark_samples.md) | Ping/CSV output and buffer-size decisions |
-| [`run_commands.md`](run_commands.md) | Reproducible commands for the full workflow |
-| [`Technical_Guide.md`](Technical_Guide.md) | Extended architecture notes |
+## What the launcher does
 
-mgreen@mykol.com
+1. Validates arguments, hostfile, Apple Silicon, and MLX-LM commands.
+2. Profiles remote links unless explicitly skipped.
+3. Enables `MLX_METAL_FAST_SYNCH=1`.
+4. Starts ranks through `mlx.launch`.
+5. Runs `mlx_lm.chat --pipeline`, which performs model-aware pipeline sharding.
+6. In noninteractive mode, broadcasts the prompt through the launcher and saves
+   the combined response.
+
+## Important constraints
+
+| Constraint | Impact |
+|---|---|
+| Apple Silicon Macs | MLX-LM cannot run in the Linux Docker test cluster. |
+| Model support | The selected MLX model must expose pipeline support. |
+| Converted weights | Select an MLX-converted model with a safetensor index for efficient per-stage downloads. |
+| First run | Each rank may download tokenizer metadata and its required weight files. |
+| Network latency | Autoregressive pipeline stages communicate for every generated token. |
+| Performance | Small models may be faster on one Mac; distribution primarily helps models constrained by memory. |
+
+## Tests
+
+The repository test validates the executable launch construction without
+requiring MLX:
+
+```bash
+python3 tests/test_llm_workflow.py
+```
+
+Real inference requires Apple Silicon hardware and model access.
