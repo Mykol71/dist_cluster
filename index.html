@@ -63,9 +63,12 @@
     hr { border: none; border-top: 1px solid #30363d; margin: 2rem 0; }
 
     table {
+      display: block;
       border-collapse: collapse;
       width: 100%;
+      max-width: 100%;
       margin: 1rem 0;
+      overflow-x: auto;
       font-size: 0.9rem;
     }
 
@@ -92,6 +95,15 @@
       margin-top: 3rem;
       color: #8b949e;
       font-size: 0.875rem;
+    }
+
+    .callout {
+      margin: 1rem 0;
+      padding: 1rem 1.15rem;
+      border: 1px solid #30363d;
+      border-left: 4px solid #58a6ff;
+      border-radius: 6px;
+      background: #161b22;
     }
   </style>
 </head>
@@ -230,7 +242,7 @@ sequenceDiagram
     <ul>
       <li>WireGuard for nodes that are not on the same local network as the orchestrator.</li>
       <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.html">SSH hardening guide</a>).</li>
-      <li>Python 3 + <code>numpy</code> (and optionally <code>mlx</code>) on all nodes.</li>
+      <li>Python 3 + <code>numpy</code> on all matrix-compute nodes.</li>
       <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
     </ul>
     <p><code>run_cluster.sh</code> is local-network aware for IPv4 ranges that start with <code>192.*</code>, <code>10.*</code>, or <code>172.*</code> (project first-octet rule, including all <code>172.*</code>). If a worker is on the same local network family as the host, it uses the host LAN IP and does not require VPN host configuration. For mixed LAN-local and VPN-only workers in one run, set <code>ALLOW_MASTER_WILDCARD_BIND=1</code> so rank 0 can bind on <code>0.0.0.0</code>.</p>
@@ -259,6 +271,44 @@ docker compose -f docker/docker-compose.yml down</code></pre>
     </p>
 
     <p>For detailed step-by-step commands including smoke tests and troubleshooting, see the <a href="docs/run_commands.html">browser-friendly run guide</a>.</p>
+
+    <hr />
+
+    <h2>Executable LLM Pipeline</h2>
+
+    <p>
+      <code>run_llm_cluster.sh</code> launches MLX-LM pipeline-parallel
+      inference locally or across Apple Silicon Macs using MLX ring or JACCL
+      communication.
+    </p>
+
+    <div class="callout">
+      <strong>Compute-node requirement:</strong> LLM pipeline ranks must be
+      Apple Silicon Macs. iPhones running iSH remain supported by the separate
+      NumPy matrix workflow, but cannot serve as MLX model shards.
+    </div>
+
+    <h3>Validate without MLX or model weights</h3>
+
+    <pre><code>python3 tests/test_llm_workflow.py
+bash run_llm_cluster.sh --dry-run --local-ranks 2 --prompt "Hello"</code></pre>
+
+    <h3>Run on an Apple Silicon Mac</h3>
+
+    <pre><code>python3 -m pip install -r requirements-llm.txt
+bash run_llm_cluster.sh \
+  --local-ranks 2 \
+  --model mlx-community/Llama-3.2-3B-Instruct-4bit \
+  --prompt "Explain pipeline parallelism in three sentences." \
+  --max-tokens 128</code></pre>
+
+    <p>
+      MLX-LM performs model-aware sharding internally; this repository does not
+      require a separate <code>shard_model.py</code>. For multi-Mac ring and
+      JACCL setup, hostfile examples, latency admission, and platform
+      constraints, open the
+      <a href="docs/AI_LLM_Use_Case.html">browser-readable LLM workflow guide</a>.
+    </p>
 
     <hr />
 
