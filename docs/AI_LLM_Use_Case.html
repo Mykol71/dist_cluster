@@ -202,13 +202,18 @@ flowchart LR
       </tbody>
     </table>
 
+    <p>
+      Classification uses the worst observed condition. Packet loss from 1–2%
+      is outside the accepted proceed tiers and aborts conservatively.
+    </p>
+
     <hr />
 
     <h2>Setup</h2>
 
     <h3>Prerequisites</h3>
     <ul>
-      <li>All nodes connected via WireGuard (see <a href="ssh_hardening.md">ssh_hardening.md</a>).</li>
+      <li>All nodes connected via WireGuard (see the <a href="ssh_hardening.html">SSH hardening guide</a>).</li>
       <li>MLX installed on every node: <code>pip install mlx mlx-lm</code></li>
       <li>A compatible model downloaded and sharded across node storage (e.g., Llama-3 8B).</li>
     </ul>
@@ -302,9 +307,9 @@ sequenceDiagram
         <tr><th>Document</th><th>Contents</th></tr>
       </thead>
       <tbody>
-        <tr><td><a href="ssh_hardening.md">ssh_hardening.md</a></td><td>Securing SSH access across VPN nodes</td></tr>
-        <tr><td><a href="latency_benchmark_samples.md">latency_benchmark_samples.md</a></td><td>Ping/CSV output and buffer-size decisions</td></tr>
-        <tr><td><a href="run_commands.md">run_commands.md</a></td><td>Reproducible commands for the full workflow</td></tr>
+        <tr><td><a href="ssh_hardening.html">SSH hardening guide</a></td><td>Securing SSH access across VPN nodes</td></tr>
+        <tr><td><a href="latency_benchmark_samples.html">Latency profiling guide</a></td><td>Ping output and buffer-size decisions</td></tr>
+        <tr><td><a href="run_commands.html">Reproducible run commands</a></td><td>Commands for the full workflow</td></tr>
         <tr><td><a href="Technical_Guide.html">Technical_Guide.html</a></td><td>Extended architecture notes</td></tr>
       </tbody>
     </table>

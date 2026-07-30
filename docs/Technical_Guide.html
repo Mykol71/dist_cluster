@@ -197,6 +197,28 @@ else:
         AGG --> DONE([✅ Result])
     </div>
 
+    <h3>Latency, jitter, and loss policy</h3>
+
+    <table>
+      <thead>
+        <tr><th>Average latency</th><th>mdev</th><th>Packet loss</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>&lt; 30 ms</td><td>&lt; 10 ms</td><td>0%</td><td>Proceed with 256 KB chunks</td></tr>
+        <tr><td>30–80 ms</td><td>10–40 ms</td><td>0%</td><td>Proceed with 1 MB chunks</td></tr>
+        <tr><td>80–150 ms</td><td>&gt; 40 ms</td><td>&lt; 1%</td><td>Proceed cautiously with 2 MB chunks</td></tr>
+        <tr><td>&gt; 150 ms</td><td>Any</td><td>Any</td><td>Abort and re-profile</td></tr>
+        <tr><td>Any</td><td>Any</td><td>&gt; 2%</td><td>Abort the unstable link</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The profiler emits JSON containing average latency, mdev/stddev, packet
+      loss, status, action, and buffer size. The orchestrator fails closed if
+      profiling fails, any link is rejected, or packet loss falls in the
+      unspecified 1–2% range.
+    </p>
+
     <hr />
 
     <h2>Known Constraints and Risks</h2>
@@ -216,7 +238,7 @@ else:
     <h3>3) Reliability</h3>
     <ul>
       <li>WAN jitter and packet loss can create stragglers and unstable step times.</li>
-      <li>Add retries, health checks, and timeout handling in orchestration scripts.</li>
+      <li>Retries, health checks, and bounded connection timeouts are enforced by the orchestration scripts.</li>
     </ul>
 
     <hr />
@@ -347,9 +369,9 @@ docker/                  # reproducible local cluster</code></pre>
     <h2>Next Actions</h2>
 
     <ul>
-      <li>✅ Add SSH hardening guide (<a href="./ssh_hardening.md"><code>docs/ssh_hardening.md</code></a>)</li>
-      <li>✅ Add latency benchmark script output samples (<a href="./latency_benchmark_samples.md"><code>docs/latency_benchmark_samples.md</code></a>)</li>
-      <li>✅ Add reproducible run command examples (<a href="./run_commands.md"><code>docs/run_commands.md</code></a>)</li>
+      <li>✅ Add <a href="./ssh_hardening.html">browser-friendly SSH hardening guide</a></li>
+      <li>✅ Add <a href="./latency_benchmark_samples.html">browser-friendly latency profiling guide</a></li>
+      <li>✅ Add <a href="./run_commands.html">browser-friendly reproducible run commands</a></li>
       <li>✅ Add failure-handling and retry strategy in orchestration (<code>run_cluster.sh</code>)</li>
       <li>✅ Add a concise README version of this architecture (<code>README.md</code>)</li>
     </ul>

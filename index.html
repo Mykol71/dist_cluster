@@ -153,6 +153,27 @@ flowchart LR
     AGG --> DONE([✅ Result])
     </div>
 
+    <h3>Link admission policy</h3>
+
+    <table>
+      <thead>
+        <tr><th>Average latency</th><th>mdev</th><th>Packet loss</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>&lt; 30 ms</td><td>&lt; 10 ms</td><td>0%</td><td>Proceed with 256 KB chunks</td></tr>
+        <tr><td>30–80 ms</td><td>10–40 ms</td><td>0%</td><td>Proceed with 1 MB chunks</td></tr>
+        <tr><td>80–150 ms</td><td>&gt; 40 ms</td><td>&lt; 1%</td><td>Proceed cautiously with 2 MB chunks</td></tr>
+        <tr><td>&gt; 150 ms</td><td>Any</td><td>Any</td><td>Abort and re-profile after fixing the link</td></tr>
+        <tr><td>Any</td><td>Any</td><td>&gt; 2%</td><td>Abort because the link is unstable</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Classification uses the worst observed condition. Packet loss from 1–2%
+      does not satisfy a proceed tier and aborts conservatively. A rejected
+      worker stops the run before any compute process is launched.
+    </p>
+
     <h2>Technical Execution Workflow</h2>
 
     <ul>
@@ -208,7 +229,7 @@ sequenceDiagram
     <h3>Prerequisites</h3>
     <ul>
       <li>WireGuard for nodes that are not on the same local network as the orchestrator.</li>
-      <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a>).</li>
+      <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.html">SSH hardening guide</a>).</li>
       <li>Python 3 + <code>numpy</code> (and optionally <code>mlx</code>) on all nodes.</li>
       <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
     </ul>
@@ -230,7 +251,14 @@ docker compose -f docker/docker-compose.yml exec master bash deploy_cluster.sh
 docker compose -f docker/docker-compose.yml exec -e MATRIX_SIZE=32 master bash run_cluster.sh
 docker compose -f docker/docker-compose.yml down</code></pre>
 
-    <p>For detailed step-by-step commands including smoke tests and troubleshooting, see <a href="docs/run_commands.md">docs/run_commands.md</a>.</p>
+    <p>
+      <strong>Latest verified result:</strong> two healthy worker links selected
+      256 KB chunks, the distributed 32×32 workload completed successfully, and
+      numerical verification passed with a maximum delta of
+      <code>4.99929e-05</code>.
+    </p>
+
+    <p>For detailed step-by-step commands including smoke tests and troubleshooting, see the <a href="docs/run_commands.html">browser-friendly run guide</a>.</p>
 
     <hr />
 
@@ -276,9 +304,9 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><th>Document</th><th>Contents</th></tr>
       </thead>
       <tbody>
-        <tr><td><a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a></td><td>Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging</td></tr>
-        <tr><td><a href="docs/latency_benchmark_samples.md">docs/latency_benchmark_samples.md</a></td><td>Sample ping/CSV output and scaling decision table</td></tr>
-        <tr><td><a href="docs/run_commands.md">docs/run_commands.md</a></td><td>Step-by-step reproducible commands for the full workflow</td></tr>
+        <tr><td><a href="docs/ssh_hardening.html">SSH hardening guide</a></td><td>Key-based auth, disable password auth, VPN firewall rules, fail2ban, audit logging</td></tr>
+        <tr><td><a href="docs/latency_benchmark_samples.html">Latency profiling guide</a></td><td>Ping output, admission policy, and buffer-size decisions</td></tr>
+        <tr><td><a href="docs/run_commands.html">Reproducible run commands</a></td><td>Step-by-step commands for the full workflow</td></tr>
         <tr><td><a href="docs/Technical_Guide.html">docs/Technical_Guide.html</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
         <tr><td><a href="docs/AI_LLM_Use_Case.html">docs/AI_LLM_Use_Case.html</a></td><td>AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX</td></tr>
         <tr><td><a href="docs/Docker_Deployment_Guide.html">docs/Docker_Deployment_Guide.html</a></td><td>Container-driven deployment guide: local test cluster and manual multi-machine WireGuard setup</td></tr>
