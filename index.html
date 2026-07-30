@@ -103,7 +103,7 @@
     <p>
       An experimental over-the-Internet distributed compute cluster that coordinates multiple devices
       (iPhones, Macs, and other SSH-reachable nodes) over SSH across either a local network or a VPN mesh. Workloads are split across nodes,
-      processed in parallel, and results are synchronized using Python-based collective operations.
+      processed in parallel, and returned through a length-prefixed TCP protocol for deterministic aggregation.
     </p>
 
     <hr />
@@ -116,15 +116,15 @@ graph TB
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+        VPN["🔒 Mesh VPN\n(WireGuard)\nEncrypted P2P Tunnel"]
     end
     subgraph CL["Compute Layer"]
         W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
         W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
     end
-    ORCH <-->|"SSH + Matrix Chunks"| VPN
-    VPN <-->|"Private VPN IP"| W1
-    VPN <-->|"Private VPN IP"| W2
+    ORCH &lt;-->|"SSH + Matrix Chunks"| VPN
+    VPN &lt;-->|"Private VPN IP"| W1
+    VPN &lt;-->|"Private VPN IP"| W2
     </div>
 
     <h2>Adaptive Optimization (The Key Innovation)</h2>
@@ -140,12 +140,14 @@ graph TB
 flowchart LR
     START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
     PING --> CHECK{Latency?}
-    CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
-    CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+    CHECK -->|"Low &lt; 30ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
+    CHECK -->|"Medium 30–99ms"| MEDIUM["1 MB\npacket chunks"]
+    CHECK -->|"High ≥ 100ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
     SMALL --> DIST["Distribute work\nto worker ranks"]
+    MEDIUM --> DIST
     LARGE --> DIST
     DIST --> COMPUTE["Workers compute\ndot-product loops"]
-    COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+    COMPUTE --> AGG["Master validates and\nreassembles row ranges"]
     AGG --> DONE([✅ Result])
     </div>
 
@@ -184,10 +186,10 @@ sequenceDiagram
     A-->>M: matrix chunk result
     B-->>M: matrix chunk result
 
-    Note over M,B: Phase 4 — Verify & Report
+    Note over M,B: Phase 4 — Verify &amp; Report
     M->>M: verify_output.py (delta check)
     M->>M: log_metrics.py (telemetry)
-    M->>M: generate_report.py → cluster_performance.csv
+    M->>M: generate_report.py → FINAL_PROJECT_SUMMARY.md
     </div>
 
     <h2>Key Findings &amp; Performance Scaling</h2>
@@ -203,7 +205,7 @@ sequenceDiagram
 
     <h3>Prerequisites</h3>
     <ul>
-      <li>Tailscale or WireGuard for nodes that are not on the same local network as the orchestrator.</li>
+      <li>WireGuard for nodes that are not on the same local network as the orchestrator.</li>
       <li>SSH key-based auth configured (see <a href="docs/ssh_hardening.md">docs/ssh_hardening.md</a>).</li>
       <li>Python 3 + <code>numpy</code> (and optionally <code>mlx</code>) on all nodes.</li>
       <li>macOS worker nodes should have either Python&nbsp;3 preinstalled or Homebrew available so <code>deploy_cluster.sh</code> can install it automatically.</li>
@@ -219,6 +221,13 @@ sequenceDiagram
     <h3>3. View the report</h3>
     <pre><code>cat FINAL_PROJECT_SUMMARY.md</code></pre>
 
+    <h3>Local Docker smoke test</h3>
+    <pre><code>bash docker/setup_keys.sh
+docker compose -f docker/docker-compose.yml up --build -d
+docker compose -f docker/docker-compose.yml exec master bash deploy_cluster.sh
+docker compose -f docker/docker-compose.yml exec -e MATRIX_SIZE=32 master bash run_cluster.sh
+docker compose -f docker/docker-compose.yml down</code></pre>
+
     <p>For detailed step-by-step commands including smoke tests and troubleshooting, see <a href="docs/run_commands.md">docs/run_commands.md</a>.</p>
 
     <hr />
@@ -232,6 +241,9 @@ log_metrics.py               # Telemetry logging and CSV output
 generate_report.py           # Final Markdown report generation
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
+tests/test_local_cluster.py  # Local master/two-worker protocol smoke test
+requirements.txt             # Python runtime dependencies
+docker/                      # Reproducible local Docker cluster
 docs/ssh_hardening.md        # SSH security hardening guide
 docs/latency_benchmark_samples.md  # Example benchmark outputs and interpretation
 docs/run_commands.md         # Reproducible copy-paste run commands
@@ -246,7 +258,7 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><th>Constraint</th><th>Description</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Network bottleneck</strong></td><td>Internet latency is much higher than local interconnects; collective ops become communication-bound quickly.</td></tr>
+        <tr><td><strong>Network bottleneck</strong></td><td>Internet latency is much higher than local interconnects; matrix transfers become communication-bound quickly.</td></tr>
         <tr><td><strong>iOS background limits</strong></td><td>iOS may suspend background terminal sessions; keep the screen active during runs.</td></tr>
         <tr><td><strong>WAN jitter</strong></td><td>Packet loss and jitter cause straggler ranks; the orchestrator retries SSH connections and aborts on persistent failure.</td></tr>
         <tr><td><strong>Amdahl's Law</strong></td><td>Communication overhead grows with node count; speedup tapers off beyond a small cluster size.</td></tr>
@@ -267,7 +279,7 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><td><a href="docs/run_commands.md">docs/run_commands.md</a></td><td>Step-by-step reproducible commands for the full workflow</td></tr>
         <tr><td><a href="docs/Technical_Guide.html">docs/Technical_Guide.html</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
         <tr><td><a href="docs/AI_LLM_Use_Case.html">docs/AI_LLM_Use_Case.html</a></td><td>AI LLM inference use case: pipeline parallelism across Apple Silicon nodes with MLX</td></tr>
-        <tr><td><a href="docs/Docker_Deployment_Guide.html">docs/Docker_Deployment_Guide.html</a></td><td>Container-driven deployment guide: local test cluster and multi-machine Tailscale setup</td></tr>
+        <tr><td><a href="docs/Docker_Deployment_Guide.html">docs/Docker_Deployment_Guide.html</a></td><td>Container-driven deployment guide: local test cluster and manual multi-machine WireGuard setup</td></tr>
       </tbody>
     </table>
 

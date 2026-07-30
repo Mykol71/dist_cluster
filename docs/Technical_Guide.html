@@ -110,15 +110,15 @@
         ORCH["🖥️ Master Node\n(deploy_cluster.sh / run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)\nEncrypted P2P Tunnel"]
+        VPN["🔒 Mesh VPN\n(WireGuard)\nEncrypted P2P Tunnel"]
     end
     subgraph CL["Compute Layer"]
         W1["📱 iPhone A\nWorker Rank 1\nApple Silicon UMA"]
         W2["📱 iPhone B\nWorker Rank 2\nApple Silicon UMA"]
     end
-    ORCH <-->|"SSH + Matrix Chunks"| VPN
-    VPN <-->|"Private VPN IP"| W1
-    VPN <-->|"Private VPN IP"| W2
+    ORCH &lt;-->|"SSH + Matrix Chunks"| VPN
+    VPN &lt;-->|"Private VPN IP"| W1
+    VPN &lt;-->|"Private VPN IP"| W2
     </div>
 
     <hr />
@@ -129,7 +129,7 @@
 
     <ul>
       <li>Use LAN addressing when workers are on the same local network as the orchestrator (IPv4 families <code>192.*</code>, <code>10.*</code>, or <code>172.*</code>).</li>
-      <li>Use a secure mesh VPN such as Tailscale or WireGuard for workers outside the host's local network.</li>
+      <li>Use a secure WireGuard mesh for workers outside the host's local network.</li>
       <li>Validate connectivity with <code>ping</code> and <code>ssh</code> before starting distributed jobs.</li>
     </ul>
 
@@ -142,30 +142,13 @@
     <pre><code>#!/usr/bin/env bash
 set -euo pipefail
 
-# Master address reachable by workers (LAN or VPN)
-MASTER_IP="192.168.1.33"
-IPHONE_A_IP="100.11.22.44"
-IPHONE_B_IP="100.11.22.55"
+# Space-separated SSH aliases. MASTER_IP is optional when auto-detection works.
+export WORKER_NODES="worker1 worker2"
+export MASTER_IP="192.168.1.33"
+export MATRIX_SIZE=600
 
-WORLD_SIZE=3   # total processes: rank 0 + two workers
-PORT=8080
-
-echo "Initializing distributed cluster..."
-
-# 1) Start worker rank 1
-ssh mobile@"$IPHONE_A_IP" \
-  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 1 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;  # keep worker launches concurrent
-
-# 2) Start worker rank 2
-ssh mobile@"$IPHONE_B_IP" \
-  "cd /app &amp;&amp; mx.distributed --world-size $WORLD_SIZE --rank 2 --master-addr $MASTER_IP --master-port $PORT python3 train_dist.py" &amp;  # keep worker launches concurrent
-
-# 3) Start rank 0 on master
-echo "Launching master process..."
-mx.distributed --world-size "$WORLD_SIZE" --rank 0 --master-addr "$MASTER_IP" --master-port "$PORT" python3 train_dist.py
-
-wait
-echo "Distributed processing finished."</code></pre>
+bash deploy_cluster.sh
+bash run_cluster.sh</code></pre>
 
     <h3>SSH Notes</h3>
 
@@ -179,22 +162,22 @@ echo "Distributed processing finished."</code></pre>
 
     <h2>Step 3 - Worker Script (<code>train_dist.py</code>)</h2>
 
-    <p>Each process initializes distributed communication and runs synchronized operations.</p>
+    <p>
+      Rank 0 listens on TCP, validates unique worker ranks, assigns contiguous
+      row ranges, and reassembles results. Workers connect with bounded retries,
+      multiply their assigned rows by a deterministic matrix, and return the
+      result using length-prefixed, non-pickle NumPy messages.
+    </p>
 
-    <pre><code>import mlx.core as mx
+    <pre><code>MASTER_ADDR = os.getenv("MASTER_ADDR", "127.0.0.1")
+WORLD_SIZE = int(os.getenv("WORLD_SIZE", "1"))
+RANK = int(os.getenv("RANK", "0"))
+MATRIX_SIZE = int(os.getenv("MATRIX_SIZE", "600"))
 
-mx.distributed.init()
-
-rank = mx.distributed.get_rank()
-world_size = mx.distributed.get_world_size()
-
-if rank == 0:
-    print(f"Master node online. World size: {world_size}")
-
-x = mx.array([1.0, 2.0, 3.0]) * (rank + 1)
-sum_x = mx.distributed.all_sum(x)
-
-print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
+if RANK == 0:
+    run_master()
+else:
+    run_worker()</code></pre>
 
     <h3>Matrix Data-Flow Diagram</h3>
 
@@ -202,12 +185,14 @@ print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
     flowchart LR
         START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
         PING --> CHECK{Latency?}
-        CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
-        CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+        CHECK -->|"Low &lt; 30ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
+        CHECK -->|"Medium 30–99ms"| MEDIUM["1 MB\npacket chunks"]
+        CHECK -->|"High ≥ 100ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
         SMALL --> DIST["Distribute work\nto worker ranks"]
+        MEDIUM --> DIST
         LARGE --> DIST
         DIST --> COMPUTE["Workers compute\ndot-product loops"]
-        COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+        COMPUTE --> AGG["Master validates and\nreassembles row ranges"]
         AGG --> DONE([✅ Result])
     </div>
 
@@ -218,7 +203,7 @@ print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
     <h3>1) Network Bottleneck</h3>
     <ul>
       <li>Device-local memory bandwidth is much higher than Internet links.</li>
-      <li>Collective operations such as <code>all_sum</code> can become communication-bound quickly.</li>
+      <li>Matrix transfers and worker stragglers can become communication-bound quickly.</li>
     </ul>
 
     <h3>2) iOS Background Execution Limits</h3>
@@ -263,7 +248,7 @@ print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
         A-->>M: matrix chunk result
         B-->>M: matrix chunk result
 
-        Note over M,B: Phase 4 — Verify & Report
+        Note over M,B: Phase 4 — Verify &amp; Report
         M->>M: verify_output.py (delta check)
         M->>M: log_metrics.py (telemetry)
         M->>M: generate_report.py → cluster_performance.csv
@@ -317,16 +302,19 @@ print(f"Rank {rank} synchronized data: {sum_x}")</code></pre>
 
     <h2>Pipeline Hook Example (<code>run_cluster.sh</code>)</h2>
 
-    <p>Append post-run hooks:</p>
+    <p>
+      Rank 0 writes measured network, compute, and wall-clock timings to
+      <code>cluster_metrics.json</code>. The orchestrator passes those values to
+      the telemetry logger before generating the report.
+    </p>
 
-    <pre><code># 4) Invoke logger and report generator
-if [ -f "./log_metrics.py" ]; then
-  python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
-fi
+    <pre><code>bash run_cluster.sh
 
-if [ -f "./generate_report.py" ]; then
-  python3 ./generate_report.py
-fi</code></pre>
+# Docker persists the generated artifacts here:
+ls output/matrix_output.csv \
+   output/cluster_metrics.json \
+   output/cluster_performance.csv \
+   output/FINAL_PROJECT_SUMMARY.md</code></pre>
 
     <hr />
 
@@ -338,7 +326,10 @@ verify_output.py         # numerical correctness checks
 log_metrics.py           # telemetry logging and graph outputs
 generate_report.py       # final markdown report generation
 src/train_dist.py        # distributed compute entrypoint
-src/ping_test.py         # network latency evaluation</code></pre>
+src/ping_test.py         # network latency evaluation
+tests/test_local_cluster.py  # local protocol smoke test
+requirements.txt         # Python runtime dependencies
+docker/                  # reproducible local cluster</code></pre>
 
     <hr />
 

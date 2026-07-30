@@ -116,6 +116,11 @@
       <strong>MLX</strong> and the existing VPN mesh infrastructure.
     </p>
 
+    <blockquote>
+      <strong>Status:</strong> This page is a conceptual future-use-case design. The current
+      runnable implementation performs deterministic distributed NumPy matrix multiplication.
+    </blockquote>
+
     <hr />
 
     <h2>Overview</h2>
@@ -144,15 +149,15 @@ graph TB
         ORCH["🖥️ Master Node\nModel coordinator\n(run_cluster.sh)"]
     end
     subgraph NL["Network Layer"]
-        VPN["🔒 Mesh VPN\n(Tailscale / WireGuard)"]
+        VPN["🔒 Mesh VPN\n(WireGuard)"]
     end
     subgraph CL["Inference Layer"]
         W1["📱 iPhone A\nLayers 0–15\nMLX inference"]
         W2["📱 iPhone B\nLayers 16–31\nMLX inference"]
     end
-    ORCH <-->|"Prompt + KV cache shards"| VPN
-    VPN <-->|"Hidden states / logits"| W1
-    VPN <-->|"Hidden states / logits"| W2
+    ORCH &lt;-->|"Prompt + KV cache shards"| VPN
+    VPN &lt;-->|"Hidden states / logits"| W1
+    VPN &lt;-->|"Hidden states / logits"| W2
     </div>
 
     <hr />
@@ -201,7 +206,7 @@ flowchart LR
 
     <h3>Prerequisites</h3>
     <ul>
-      <li>All nodes connected via Tailscale or WireGuard (see <a href="ssh_hardening.md">ssh_hardening.md</a>).</li>
+      <li>All nodes connected via WireGuard (see <a href="ssh_hardening.md">ssh_hardening.md</a>).</li>
       <li>MLX installed on every node: <code>pip install mlx mlx-lm</code></li>
       <li>A compatible model downloaded and sharded across node storage (e.g., Llama-3 8B).</li>
     </ul>
