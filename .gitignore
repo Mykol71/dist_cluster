@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+output/
+matrix_output.csv
+cluster_metrics.json
+cluster_performance.csv
+speedup_curve.png
+FINAL_PROJECT_SUMMARY.md

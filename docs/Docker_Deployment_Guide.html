@@ -111,9 +111,6 @@
         <tr><td><code>entrypoint-worker.sh</code></td><td>Injects your SSH public key and starts the SSH daemon inside the worker container</td></tr>
         <tr><td><code>docker-compose.yml</code></td><td>Local test cluster — one master + two workers on a shared bridge network</td></tr>
         <tr><td><code>setup_keys.sh</code></td><td>Generates the SSH keypair used between master and workers</td></tr>
-        <tr><td><code>bootstrap/linux.sh</code></td><td>One-shot Linux host setup (Docker Engine + Tailscale)</td></tr>
-        <tr><td><code>bootstrap/macos.sh</code></td><td>One-shot macOS host setup (Docker Desktop + Tailscale via Homebrew)</td></tr>
-        <tr><td><code>bootstrap/windows.ps1</code></td><td>One-shot Windows host setup (Docker Desktop + Tailscale via winget)</td></tr>
       </tbody>
     </table>
 
@@ -134,11 +131,11 @@ docker compose -f docker/docker-compose.yml up --build -d
 
 # 3. Deploy Python dependencies and sync source files to workers
 docker compose -f docker/docker-compose.yml exec master \
-  bash -c "WORKER_NODES=(worker1 worker2) bash deploy_cluster.sh"
+  bash deploy_cluster.sh
 
 # 4. Run the distributed workload
 docker compose -f docker/docker-compose.yml exec master \
-  bash -c "WORKER_NODES=(worker1 worker2) bash run_cluster.sh"
+  bash run_cluster.sh
 
 # 5. Tear down
 docker compose -f docker/docker-compose.yml down</code></pre>
@@ -152,42 +149,13 @@ docker compose -f docker/docker-compose.yml down</code></pre>
       The machines communicate over a <strong>Tailscale</strong> VPN mesh.
     </p>
 
-    <h3>Step 1 — Bootstrap every node</h3>
+    <h3>Step 1 — Prepare every node</h3>
 
-    <p>Run the appropriate bootstrap script <strong>once</strong> on each machine:</p>
-
-    <h4>macOS</h4>
-    <pre><code># Worker node
-bash docker/bootstrap/macos.sh --role worker
-
-# Master node
-bash docker/bootstrap/macos.sh --role master</code></pre>
-
-    <h4>Linux</h4>
-    <pre><code># Worker node (run as root or with sudo)
-sudo bash docker/bootstrap/linux.sh --role worker
-
-# Master node
-sudo bash docker/bootstrap/linux.sh --role master</code></pre>
-
-    <h4>Windows (elevated PowerShell)</h4>
-    <pre><code># Allow script execution for this session
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-# Worker node
-.\docker\bootstrap\windows.ps1 -Role worker
-
-# Master node
-.\docker\bootstrap\windows.ps1 -Role master</code></pre>
-
-    <p>The bootstrap scripts:</p>
-    <ul>
-      <li>Install Docker Desktop / Docker Engine</li>
-      <li>Install Tailscale</li>
-      <li>Generate an SSH keypair (if none exists)</li>
-      <li>Build the appropriate Docker image</li>
-      <li>Start the worker container on <strong>port 2222</strong> (worker role only)</li>
-    </ul>
+    <p>
+      Install Docker and WireGuard using the operating system vendor's
+      supported installation process. Build <code>Dockerfile.worker</code> on
+      worker machines and <code>Dockerfile.master</code> on the master.
+    </p>
 
     <h3>Step 2 — Connect all nodes to Tailscale</h3>
 

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
+set -uo pipefail
 
 # CONFIGURATION
-WORKER_NODES=("iphoneA" "iphoneB")
+WORKER_NODES_CONFIG=${WORKER_NODES:-"iphoneA iphoneB"}
+read -r -a WORKER_NODES <<< "$WORKER_NODES_CONFIG"
 LOCAL_PROJECT_DIR="./src"
 DEFAULT_LINUX_REMOTE_PROJECT_DIR="/app"
 DEFAULT_DARWIN_REMOTE_PROJECT_DIR="dist_cluster"
 
 # Define the Python libraries your GPU project needs
 REQUIRED_PIP_PACKAGES=("numpy") # Note: use "mlx" if running on native Apple Silicon environments
+DEPLOY_PIDS=()
 
 echo "=================================================="
 echo "🚀 Initializing Parallel Deployment & Dependency Engine"
@@ -59,35 +62,46 @@ echo "❌ [$node] Could not determine a writable remote project directory."
 return 1
 fi
 
+if ssh "$node" "command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1"; then
+echo "🐍 [$node] Existing Python and pip installation detected."
+else
 case "$remote_os" in
 Linux)
 if ssh "$node" "command -v apk >/dev/null 2>&1"; then
-echo "📦 [$node] Detected Alpine Linux. Verifying system packages..."
-ssh "$node" "apk update && apk add --no-cache python3 py3-pip python3-dev gcc g++ make gfortran musl-dev" > /dev/null 2>&1
+echo "📦 [$node] Installing Python with apk..."
+if ! ssh "$node" "apk update && apk add --no-cache python3 py3-pip"; then
+echo "❌ [$node] apk failed to install Python and pip."
+return 1
+fi
 elif ssh "$node" "command -v apt-get >/dev/null 2>&1"; then
-echo "📦 [$node] Detected Debian/Ubuntu Linux. Verifying system packages..."
-ssh "$node" "apt-get update && apt-get install -y python3 python3-pip python3-dev build-essential" > /dev/null 2>&1
+echo "📦 [$node] Installing Python with apt..."
+if ! ssh "$node" "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip"; then
+echo "❌ [$node] apt failed to install Python and pip."
+return 1
+fi
 else
-echo "⚠️  [$node] Unsupported Linux package manager. Assuming Python is preinstalled."
+echo "❌ [$node] Python/pip missing and no supported Linux package manager found."
+return 1
 fi
 ;;
 Darwin)
-echo "📦 [$node] Detected macOS. Verifying Python environment..."
-if ! ssh "$node" "command -v python3 >/dev/null 2>&1"; then
+echo "📦 [$node] Installing Python on macOS..."
 if ssh "$node" "command -v brew >/dev/null 2>&1"; then
-ssh "$node" "brew install python" > /dev/null 2>&1
-else
-echo "❌ [$node] Python3 is missing and Homebrew is unavailable. Install Python3 manually."
+if ! ssh "$node" "brew install python"; then
+echo "❌ [$node] Homebrew failed to install Python."
 return 1
 fi
+else
+echo "❌ [$node] Python3 is missing and Homebrew is unavailable."
+return 1
 fi
-ssh "$node" "python3 -m ensurepip --upgrade >/dev/null 2>&1 || true" > /dev/null 2>&1
 ;;
 *)
 echo "❌ [$node] Unsupported operating system: $remote_os"
 return 1
 ;;
 esac
+fi
 
 # Double check Python installation success
 if ! ssh "$node" "command -v python3" > /dev/null 2>&1; then
@@ -138,10 +152,21 @@ echo "--------------------------------------------------"
 
 for node in "${WORKER_NODES[@]}"; do
 deploy_and_verify_node "$node" &
+DEPLOY_PIDS+=("$!")
 done
 
 # Wait for all environmental verification and code deployment loops to complete
-wait
+deploy_failed=0
+for pid in "${DEPLOY_PIDS[@]}"; do
+if ! wait "$pid"; then
+deploy_failed=1
+fi
+done
+
+if [ "$deploy_failed" -ne 0 ]; then
+echo "❌ One or more worker deployments failed." >&2
+exit 1
+fi
 
 echo "--------------------------------------------------"
 echo "🎉 Cluster environment setup finalized!"

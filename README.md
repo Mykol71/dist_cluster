@@ -132,6 +132,16 @@ bash run_cluster.sh
 cat FINAL_PROJECT_SUMMARY.md
 ```
 
+### Local protocol smoke test
+
+After installing the local dependencies, validate the master/worker protocol
+without SSH or remote nodes:
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 tests/test_local_cluster.py
+```
+
 For detailed step-by-step commands including smoke tests and troubleshooting, see [`docs/run_commands.md`](docs/run_commands.md).
 
 ---

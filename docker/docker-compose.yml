@@ -30,8 +30,8 @@ services:
     container_name: dist_master
     hostname: master
     environment:
-      # Override worker node names to match the compose service hostnames
       - WORKER_NODES=worker1 worker2
+      - OUTPUT_DIR=/dist_cluster/output
     volumes:
       # Mount the SSH private key so the master can SSH into workers
       - ./keys/id_rsa:/root/.ssh/id_rsa:ro
@@ -41,15 +41,14 @@ services:
     networks:
       - cluster_net
     depends_on:
-      - worker1
-      - worker2
+      worker1:
+        condition: service_healthy
+      worker2:
+        condition: service_healthy
     stdin_open: true
     tty: true
-    # Patch WORKER_NODES in the scripts to use compose service hostnames,
-    # then drop into an interactive shell ready to run the cluster.
     command: >
       bash -c "
-        sed -i 's/^WORKER_NODES=.*/WORKER_NODES=(worker1 worker2)/' deploy_cluster.sh run_cluster.sh;
         echo '✅ Master container ready. Run: bash deploy_cluster.sh && bash run_cluster.sh';
         exec bash
       "
@@ -67,6 +66,11 @@ services:
       - cluster_net
     expose:
       - "22"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/127.0.0.1/22'"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
 
   # ── Worker Node 2 (iphoneB equivalent) ──────────────────────────────────────
   worker2:
@@ -81,6 +85,11 @@ services:
       - cluster_net
     expose:
       - "22"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/127.0.0.1/22'"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
 
 # ── Secrets ─────────────────────────────────────────────────────────────────
 secrets:

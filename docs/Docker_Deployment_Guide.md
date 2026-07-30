@@ -17,9 +17,6 @@ configure SSH on each worker node, and works identically on **macOS**,
 | `entrypoint-worker.sh` | Injects your SSH public key and starts the SSH daemon inside the worker container |
 | `docker-compose.yml` | Local test cluster — one master + two workers on a shared bridge network |
 | `setup_keys.sh` | Generates the SSH keypair used between master and workers |
-| `bootstrap/linux.sh` | One-shot Linux host setup (Docker Engine + WireGuard) |
-| `bootstrap/macos.sh` | One-shot macOS host setup (Docker Desktop + WireGuard via Homebrew) |
-| `bootstrap/windows.ps1` | One-shot Windows host setup (Docker Desktop + WireGuard via winget) |
 
 ---
 
@@ -37,11 +34,11 @@ docker compose -f docker/docker-compose.yml up --build -d
 
 # 3. Deploy Python dependencies and sync source files to workers
 docker compose -f docker/docker-compose.yml exec master \
-  bash -c "WORKER_NODES=(worker1 worker2) bash deploy_cluster.sh"
+  bash deploy_cluster.sh
 
 # 4. Run the distributed workload
 docker compose -f docker/docker-compose.yml exec master \
-  bash -c "WORKER_NODES=(worker1 worker2) bash run_cluster.sh"
+  bash run_cluster.sh
 
 # 5. Tear down
 docker compose -f docker/docker-compose.yml down
@@ -54,46 +51,11 @@ docker compose -f docker/docker-compose.yml down
 Each physical machine (Mac, Windows PC, Linux box) runs one Docker
 container.  The machines communicate over a **WireGuard** VPN mesh.
 
-### Step 1 — Bootstrap every node
+### Step 1 — Prepare every node
 
-Run the appropriate bootstrap script **once** on each machine:
-
-**macOS**
-```bash
-# Worker node
-bash docker/bootstrap/macos.sh --role worker
-
-# Master node
-bash docker/bootstrap/macos.sh --role master
-```
-
-**Linux**
-```bash
-# Worker node (run as root or with sudo)
-sudo bash docker/bootstrap/linux.sh --role worker
-
-# Master node
-sudo bash docker/bootstrap/linux.sh --role master
-```
-
-**Windows** (elevated PowerShell)
-```powershell
-# Allow script execution for this session
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-# Worker node
-.\docker\bootstrap\windows.ps1 -Role worker
-
-# Master node
-.\docker\bootstrap\windows.ps1 -Role master
-```
-
-The bootstrap scripts:
-- Install Docker Desktop / Docker Engine
-- Install WireGuard
-- Generate an SSH keypair (if none exists)
-- Build the appropriate Docker image
-- Start the worker container on **port 2222** (worker role only)
+Install Docker and WireGuard using the operating system vendor's supported
+installation process. Build `Dockerfile.worker` on worker machines and
+`Dockerfile.master` on the master.
 
 ### Step 2 — Connect all nodes to WireGuard
 

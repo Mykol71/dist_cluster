@@ -82,27 +82,34 @@ The script will:
 
 ## Step 4 — Smoke Test
 
-Run a minimal distributed smoke test (simple `all_sum`) to verify comms before heavy workloads:
+Run the localhost protocol smoke test before using remote workers:
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 tests/test_local_cluster.py
+```
+
+For a manual remote smoke test, use a small matrix workload:
 
 ```bash
 REMOTE_DIR="/app" # use "~/dist_cluster" on macOS workers unless you exported REMOTE_PROJECT_DIR
 
 ssh workerA "cd $REMOTE_DIR && \
-  MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=1 \
+  MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=1 MATRIX_SIZE=32 \
   python3 train_dist.py" &
 
 ssh workerB "cd $REMOTE_DIR && \
-  MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=2 \
+  MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=2 MATRIX_SIZE=32 \
   python3 train_dist.py" &
 
-MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=0 \
+MASTER_ADDR=100.11.22.33 MASTER_PORT=8080 WORLD_SIZE=3 RANK=0 MATRIX_SIZE=32 \
   python3 src/train_dist.py
 
 wait
 ```
 
-Expected output: each rank prints its synchronized `all_sum` result.  
-Example (rank 0): `Rank 0 synchronized data: [6. 12. 18.]`
+Expected output: rank 0 reports both worker connections and writes a 32×32
+`matrix_output.csv` file.
 
 ---
 

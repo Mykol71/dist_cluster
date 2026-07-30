@@ -14,13 +14,22 @@ set -euo pipefail
 
 # ─── CONFIGURATION ──────────────────────────────────────────────────────────
 
-WORKER_NODES=("iphoneA" "iphoneB")
+WORKER_NODES_CONFIG=${WORKER_NODES:-"iphoneA iphoneB"}
+read -r -a WORKER_NODES <<< "$WORKER_NODES_CONFIG"
 MASTER_PORT=8080
 WORLD_SIZE=$(( ${#WORKER_NODES[@]} + 1 ))
 LOCAL_PROJECT_DIR="./src"
 DEFAULT_LINUX_REMOTE_PROJECT_DIR="/app"
 DEFAULT_DARWIN_REMOTE_PROJECT_DIR="dist_cluster"
 SCRIPT_NAME="train_dist.py"
+MATRIX_SIZE=${MATRIX_SIZE:-600}
+OUTPUT_DIR=${OUTPUT_DIR:-.}
+mkdir -p "$OUTPUT_DIR"
+export OUTPUT_FILENAME="$OUTPUT_DIR/matrix_output.csv"
+export METRICS_FILENAME="$OUTPUT_DIR/cluster_metrics.json"
+export CLUSTER_LOG_FILE="$OUTPUT_DIR/cluster_performance.csv"
+export CLUSTER_CHART_FILE="$OUTPUT_DIR/speedup_curve.png"
+export REPORT_FILE="$OUTPUT_DIR/FINAL_PROJECT_SUMMARY.md"
 
 # Retry settings for SSH worker launch
 SSH_MAX_RETRIES=3        # maximum attempts per node
@@ -369,6 +378,7 @@ for node in "${WORKER_NODES[@]}"; do
        MASTER_PORT=$MASTER_PORT \
        WORLD_SIZE=$WORLD_SIZE \
        RANK=$RANK \
+       MATRIX_SIZE=$MATRIX_SIZE \
        BUFFER_SIZE=$OPTIMAL_BUFFER \
        python3 $SCRIPT_NAME"
   ) &
@@ -412,6 +422,7 @@ python3 "$LOCAL_PROJECT_DIR/$SCRIPT_NAME"
 echo "--------------------------------------------------"
 echo "⏳ Waiting for remote worker processes to finish..."
 wait
+REMOTE_PIDS=()
 echo "🎉 All distributed processing steps completed successfully!"
 
 # ── 6. POST-RUN PIPELINE ─────────────────────────────────────────────────────
@@ -427,15 +438,25 @@ if [ -f "./verify_output.py" ]; then
   python3 ./verify_output.py
 fi
 
-# Log performance metrics
-# In production, parse these from train_dist.py stdout; here we use placeholders.
-MOCK_NET_TIME=0.3210
-MOCK_COMP_TIME=0.1420
-TOTAL_TIME=0.4630
+# Log measured performance metrics emitted by rank 0.
+METRICS_FILE="$METRICS_FILENAME"
+if [ -f "$METRICS_FILE" ]; then
+  read -r NETWORK_TIME COMPUTE_TIME TOTAL_TIME < <(python3 - "$METRICS_FILE" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    values = json.load(f)
+print(values["network_seconds"], values["compute_seconds"], values["total_seconds"])
+PY
+)
+else
+  echo "❌ Expected metrics file '$METRICS_FILE' was not created." >&2
+  exit 1
+fi
 
 if [ -f "./log_metrics.py" ]; then
   echo "📊 Logging performance metrics..."
-  python3 ./log_metrics.py "$WORLD_SIZE" "$MOCK_NET_TIME" "$MOCK_COMP_TIME" "$TOTAL_TIME"
+  python3 ./log_metrics.py "$WORLD_SIZE" "$NETWORK_TIME" "$COMPUTE_TIME" "$TOTAL_TIME"
 fi
 
 # Generate final report
@@ -445,4 +466,4 @@ if [ -f "./generate_report.py" ]; then
 fi
 
 echo ""
-echo "✅ Pipeline complete. See FINAL_PROJECT_SUMMARY.md for results."
+echo "✅ Pipeline complete. See $REPORT_FILE for results."

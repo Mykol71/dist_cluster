@@ -21,11 +21,11 @@ set -euo pipefail
 AUTH_KEYS="/root/.ssh/authorized_keys"
 
 if [ -n "${SSH_PUBLIC_KEY:-}" ]; then
-    echo "$SSH_PUBLIC_KEY" >> "$AUTH_KEYS"
+    printf '%s\n' "$SSH_PUBLIC_KEY" > "$AUTH_KEYS"
     chmod 600 "$AUTH_KEYS"
     echo "✅ SSH public key installed from SSH_PUBLIC_KEY environment variable."
 elif [ -f /run/secrets/ssh_public_key ]; then
-    cat /run/secrets/ssh_public_key >> "$AUTH_KEYS"
+    cp /run/secrets/ssh_public_key "$AUTH_KEYS"
     chmod 600 "$AUTH_KEYS"
     echo "✅ SSH public key installed from Docker Secret."
 elif [ -f "$AUTH_KEYS" ] && [ -s "$AUTH_KEYS" ]; then

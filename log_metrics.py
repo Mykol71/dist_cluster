@@ -1,74 +1,53 @@
 #!/usr/bin/env python3
+"""Persist and chart cluster timing metrics."""
 import csv
 import os
 import sys
 import time
 
-LOG_FILE = "cluster_performance.csv"
-CHART_FILE = "speedup_curve.png"
-
-# Check for visualization library
+LOG_FILE = os.getenv("CLUSTER_LOG_FILE", "cluster_performance.csv")
+CHART_FILE = os.getenv("CLUSTER_CHART_FILE", "speedup_curve.png")
 try:
-import matplotlib.pyplot as plt
-HAS_MATPLOTLIB = True
+    import matplotlib.pyplot as plt
 except ImportError:
-HAS_MATPLOTLIB = False
+    plt = None
+
 
 def log_session(nodes_count, network_sec, compute_sec, total_sec):
-"""Appends execution telemetry to a persistent CSV log file"""
-file_exists = os.path.isfile(LOG_FILE)
-with open(LOG_FILE, mode="a", newline="") as f:
-writer = csv.writer(f)
-if not file_exists:
-# Column headers for tracking performance metrics across multiple runs
-writer.writerow(["Timestamp", "Active_Nodes", "Network_Time_Sec", "Compute_Time_Sec", "Total_Time_Sec"])
-timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-writer.writerow([timestamp, nodes_count, f"{network_sec:.4f}", f"{compute_sec:.4f}", f"{total_sec:.4f}"])
-print(f"📊 Telemetry logged securely to '{LOG_FILE}'")
+    file_exists = os.path.isfile(LOG_FILE)
+    with open(LOG_FILE, "a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["Timestamp", "Active_Nodes", "Network_Time_Sec", "Compute_Time_Sec", "Total_Time_Sec"])
+        writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), nodes_count, f"{network_sec:.4f}", f"{compute_sec:.4f}", f"{total_sec:.4f}"])
+    print(f"Telemetry logged to '{LOG_FILE}'")
+
 
 def generate_chart():
-"""Reads historical log data and compiles a visual Speedup Curve chart"""
-if not HAS_MATPLOTLIB:
-print("⚠️ Matplotlib not found. Skipping PNG chart generation.")
-return
+    if plt is None:
+        print("Matplotlib not installed; skipping chart generation.")
+        return
+    with open(LOG_FILE, newline="", encoding="utf-8") as file:
+        rows = list(csv.DictReader(file))
+    if not rows:
+        return
+    nodes = [int(row["Active_Nodes"]) for row in rows]
+    total_times = [float(row["Total_Time_Sec"]) for row in rows]
+    baseline = total_times[0]
+    plt.figure(figsize=(8, 5))
+    plt.plot(nodes, [baseline / value for value in total_times], marker="o", label="Actual")
+    plt.plot(nodes, nodes, "--", label="Ideal")
+    plt.xlabel("Number of compute nodes")
+    plt.ylabel("Speedup")
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.legend()
+    plt.savefig(CHART_FILE, dpi=300)
+    plt.close()
+    print(f"Performance chart saved to '{CHART_FILE}'")
 
-# Parse logged metrics
-nodes = []
-total_times = []
-with open(LOG_FILE, mode="r") as f:
-reader = csv.DictReader(f)
-for row in reader:
-nodes.append(int(row["Active_Nodes"]))
-total_times.append(float(row["Total_Time_Sec"]))
-
-if not nodes:
-return
-
-# Base calculations assuming the first single-node log is our baseline
-baseline_time = total_times[0]
-actual_speedup = [baseline_time / t for t in total_times]
-ideal_speedup = [n for n in nodes]
-
-# Render line chart configurations
-plt.figure(figsize=(8, 5))
-plt.plot(nodes, actual_speedup, marker='o', color='#007AFF', linewidth=2, label='Actual Parallel Performance')
-plt.plot(nodes, ideal_speedup, linestyle='--', color='#FF9500', label='Ideal Scaling (Linear)')
-plt.title('iPhone Cluster Distributed Parallel Speedup Curve')
-plt.xlabel('Number of Compute Nodes (PC + iPhones)')
-plt.ylabel('Speedup Factor (x-times Faster)')
-plt.xticks(list(set(nodes)))
-plt.grid(True, linestyle=':', alpha=0.6)
-plt.legend()
-plt.savefig(CHART_FILE, dpi=300)
-plt.close()
-print(f"📈 Performance visualization exported successfully to '{CHART_FILE}'")
 
 if __name__ == "__main__":
-# Expects arguments passed down sequentially from the automated Bash wrapper
-if len(sys.argv) < 5:
-# Dummy or testing values fallback if run manually without args
-log_session(2, 0.3210, 0.1420, 0.4630)
-else:
-log_session(int(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]))
-generate_chart()
-
+    if len(sys.argv) != 5:
+        raise SystemExit("usage: log_metrics.py NODES NETWORK_SECONDS COMPUTE_SECONDS TOTAL_SECONDS")
+    log_session(int(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]))
+    generate_chart()
