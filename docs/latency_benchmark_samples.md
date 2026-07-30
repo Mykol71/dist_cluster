@@ -1,118 +1,74 @@
-# Latency Benchmark Sample Outputs
+# Latency Profiling and Link Admission
 
-This document contains realistic example outputs from the latency benchmark tooling
-(`src/ping_test.py`) used to profile network conditions before launching the distributed
-cluster. Use these samples to understand what healthy vs. degraded output looks like and
-how to map results to scaling decisions.
+`src/ping_test.py` profiles each worker immediately before launch. It parses
+average round-trip latency, mdev/stddev, and packet loss from the operating
+system's `ping` summary. Accepted links receive a chunk-size recommendation;
+rejected links stop `run_cluster.sh` before any workers start.
 
----
+The probe count defaults to 10 and can be changed with `PING_COUNT`.
 
-## 1. Ping-Style Summary
+## Decision table
 
-The benchmark runs a sequence of ICMP/TCP probes and emits a one-line summary per node.
+| avg latency | mdev | packet loss | Recommended action |
+|---|---:|---:|---|
+| `< 30 ms` | `< 10 ms` | `0%` | Proceed, 256 KB chunks |
+| `30–80 ms` | `10–40 ms` | `0%` | Proceed, 1 MB chunks |
+| `80–150 ms` | `> 40 ms` | `< 1%` | Proceed cautiously, 2 MB chunks |
+| `> 150 ms` | any | any | Abort; re-profile after fix |
+| any | any | `> 2%` | Abort; unstable link |
 
-```
-PING 100.11.22.44 (iphoneA) 56 bytes of data — 20 packets
-rtt min/avg/max/mdev = 18.42/32.17/71.83/14.55 ms
+Classification is conservative and uses the worst observed condition. For
+example, low average latency with mdev above 40 ms uses the cautious 2 MB tier.
+Packet loss from 1–2% does not satisfy any proceed tier and therefore aborts.
 
-PING 100.11.22.55 (iphoneB) 56 bytes of data — 20 packets
-rtt min/avg/max/mdev = 22.10/45.63/118.24/27.38 ms
-```
+## Examples
 
-**Field meanings:**
-| Field  | Description |
-|--------|-------------|
-| `min`  | Best-case one-way trip (wire conditions at their cleanest) |
-| `avg`  | Expected per-message overhead in collective operations |
-| `max`  | Worst-case spike; large values indicate LTE/cellular jitter |
-| `mdev` | Mean deviation — high values (>20 ms) suggest unstable routing |
+Healthy Wi-Fi:
 
----
-
-## 2. CSV Sample Snippet
-
-The benchmark appends one row per probe to `cluster_latency.csv`:
-
-```csv
-timestamp,node,latency_ms,jitter_ms,packet_loss
-2024-11-01T14:02:01Z,iphoneA,18.42,3.11,0.0
-2024-11-01T14:02:02Z,iphoneA,21.05,2.83,0.0
-2024-11-01T14:02:03Z,iphoneA,71.83,49.21,0.0
-2024-11-01T14:02:04Z,iphoneA,19.74,1.89,0.0
-2024-11-01T14:02:01Z,iphoneB,22.10,4.50,0.0
-2024-11-01T14:02:02Z,iphoneB,118.24,96.14,0.0
-2024-11-01T14:02:03Z,iphoneB,28.33,6.23,0.0
-2024-11-01T14:02:04Z,iphoneB,44.91,16.58,5.0
-```
-
-**Column descriptions:**
-| Column         | Description |
-|----------------|-------------|
-| `timestamp`    | ISO-8601 probe time |
-| `node`         | SSH hostname or alias from `IPHONE_NODES` |
-| `latency_ms`   | Round-trip time for this probe in milliseconds |
-| `jitter_ms`    | Absolute difference from the previous probe (smoothed) |
-| `packet_loss`  | Percentage of lost probes in the last 20-probe window |
-
----
-
-## 3. Interpretation Notes and Scaling Decisions
-
-### Healthy baseline (Wi-Fi, low contention)
-
-```
+```text
 rtt min/avg/max/mdev = 12.00/20.00/35.00/8.00 ms
+10 packets transmitted, 10 received, 0% packet loss
 ```
 
-- `avg < 30 ms` and `mdev < 10 ms`: comfortable for standard chunk sizes.
-- Recommended `BUFFER_SIZE`: 256 KB (`262144` bytes).
-- Collective operations (`all_sum`) complete in < 2 ms of overhead per step.
+Result: proceed with 256 KB chunks.
 
-### Moderate degradation (LTE / shared Wi-Fi)
+Moderate link:
 
-```
+```text
 rtt min/avg/max/mdev = 20.00/55.00/120.00/30.00 ms
+10 packets transmitted, 10 received, 0% packet loss
 ```
 
-- `avg 30–80 ms`, `mdev 15–40 ms`: increase chunk size to amortize overhead.
-- Recommended `BUFFER_SIZE`: 1 MB (`1048576` bytes).
-- Expect ~10–20 % slowdown vs. single-device baseline due to sync wait time.
+Result: proceed with 1 MB chunks.
 
-### Severe degradation (cellular roaming / congested network)
+High-jitter link:
 
+```text
+rtt min/avg/max/mdev = 70.00/120.00/190.00/55.00 ms
+100 packets transmitted, 100 received, 0% packet loss
 ```
-rtt min/avg/max/mdev = 80.00/180.00/450.00/95.00 ms  packet_loss=3.2%
+
+Result: proceed cautiously with 2 MB chunks.
+
+Unstable link:
+
+```text
+rtt min/avg/max/mdev = 80.00/180.00/450.00/95.00 ms
+100 packets transmitted, 96 received, 4% packet loss
 ```
 
-- `avg > 100 ms` or `packet_loss > 2 %`: distributed run may stall or fail.
-- Recommended action: abort run, switch nodes to better network, re-profile.
-- Do not attempt large matrix workloads — stragglers will dominate wall time.
+Result: abort before worker launch.
 
-### Decision table
-
-| avg latency | mdev   | packet_loss | Recommended action            |
-|-------------|--------|-------------|-------------------------------|
-| < 30 ms     | < 10   | 0 %         | Proceed, 256 KB chunks        |
-| 30–80 ms    | 10–40  | 0 %         | Proceed, 1 MB chunks          |
-| 80–150 ms   | > 40   | < 1 %       | Proceed cautiously, 2 MB chunks |
-| > 150 ms    | any    | any         | Abort; re-profile after fix   |
-| any         | any    | > 2 %       | Abort; unstable link          |
-
----
-
-## 4. Running the Benchmark Manually
+## Manual use
 
 ```bash
-# Profile a single node (outputs buffer recommendation in bytes)
-python3 ./src/ping_test.py iphoneA
-
-# Profile all nodes and write CSV
-for node in iphoneA iphoneB; do
-  python3 ./src/ping_test.py "$node" >> cluster_latency.csv
-done
+python3 src/ping_test.py worker1
 ```
 
-Results are also collected automatically at the start of each `run_cluster.sh` execution.
-See [`docs/run_commands.md`](run_commands.md) for the full workflow.
+Accepted profiles are printed as JSON:
 
-mgreen@mykol.com
+```json
+{"avg_latency_ms":20.0,"mdev_ms":8.0,"packet_loss_percent":0.0,"status":"proceed","action":"Proceed, 256 KB chunks","buffer_size":262144,"host":"worker1"}
+```
+
+An abort profile exits with status 2, allowing shell automation to fail closed.

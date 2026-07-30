@@ -195,8 +195,10 @@ flowchart LR
         <tr><th>Condition</th><th>Buffer size</th><th>Rationale</th></tr>
       </thead>
       <tbody>
-        <tr><td>Low latency ≤ 20 ms (Wi-Fi)</td><td>256 KB chunks</td><td>Minimize per-token round-trip</td></tr>
-        <tr><td>High latency &gt; 20 ms (LTE)</td><td>2 MB blocks</td><td>Amortize transfer overhead</td></tr>
+        <tr><td>&lt; 30 ms, mdev &lt; 10, 0% loss</td><td>256 KB chunks</td><td>Minimize per-token round-trip</td></tr>
+        <tr><td>30–80 ms, mdev ≤ 40, 0% loss</td><td>1 MB chunks</td><td>Balance responsiveness and overhead</td></tr>
+        <tr><td>80–150 ms, loss &lt; 1%</td><td>2 MB blocks</td><td>Proceed cautiously</td></tr>
+        <tr><td>&gt; 150 ms or loss &gt; 2%</td><td>Abort</td><td>Repair and re-profile the link</td></tr>
       </tbody>
     </table>
 

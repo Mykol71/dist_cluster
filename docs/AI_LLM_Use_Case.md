@@ -67,8 +67,10 @@ workloads:
 
 | Condition | Buffer size | Rationale |
 |-----------|-------------|-----------|
-| Low latency ≤ 20 ms (Wi-Fi) | 256 KB chunks | Minimize per-token round-trip |
-| High latency > 20 ms (LTE) | 2 MB blocks | Amortize transfer overhead |
+| `< 30 ms`, mdev `< 10`, `0%` loss | 256 KB chunks | Minimize per-token round-trip |
+| `30–80 ms`, mdev `≤ 40`, `0%` loss | 1 MB chunks | Balance responsiveness and overhead |
+| `80–150 ms`, loss `< 1%` | 2 MB blocks | Proceed cautiously |
+| `> 150 ms` or loss `> 2%` | Abort | Repair and re-profile the link |
 
 ---
 

@@ -323,12 +323,24 @@ echo "--------------------------------------------------"
 # ── 1. LATENCY PROFILING ────────────────────────────────────────────────────
 
 echo "📡 Measuring network latency across active worker paths (LAN/VPN, with local detection by project 192/10/172 first-octet rule)..."
-OPTIMAL_BUFFER=1048576  # default fallback (1 MB)
+OPTIMAL_BUFFER=262144
 
 for node in "${WORKER_NODES[@]}"; do
-  # ping_test.py returns the recommended buffer size in bytes
-  detected_buffer=$(python3 ./src/ping_test.py "$node" 2>/dev/null || echo "$OPTIMAL_BUFFER")
-  if [ "$detected_buffer" -gt "$OPTIMAL_BUFFER" ] 2>/dev/null; then
+  if ! profile_json=$(python3 ./src/ping_test.py "$node"); then
+    echo "❌ [$node] Latency profile rejected the link. Aborting before worker launch." >&2
+    exit 1
+  fi
+  profile_fields=$(python3 -c '
+import json, sys
+p = json.loads(sys.argv[1])
+print("{}|{}|{}|{}|{}".format(
+    p["buffer_size"], p["avg_latency_ms"], p["mdev_ms"],
+    p["packet_loss_percent"], p["action"]
+))
+' "$profile_json")
+  IFS='|' read -r detected_buffer avg_latency mdev packet_loss profile_action <<< "$profile_fields"
+  echo "📶 [$node] avg=${avg_latency}ms mdev=${mdev}ms loss=${packet_loss}% — $profile_action"
+  if [ "$detected_buffer" -gt "$OPTIMAL_BUFFER" ]; then
     OPTIMAL_BUFFER=$detected_buffer
   fi
 done

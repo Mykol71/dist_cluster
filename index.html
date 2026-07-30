@@ -132,17 +132,19 @@ graph TB
     <ul>
       <li><strong>The Network Bottleneck:</strong> Internet routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.</li>
       <li><strong>Dynamic Packet Tuning:</strong> An automated network ping test executes right before data distribution.</li>
-      <li><strong>Low Latency (Wi-Fi):</strong> Drops down to responsive 256&nbsp;KB packet chunks.</li>
-      <li><strong>High Latency (Cellular/LTE):</strong> Automatically scales to large 2&nbsp;MB streaming data blocks to maximize throughput.</li>
+      <li><strong>Healthy links:</strong> Use responsive 256&nbsp;KB packet chunks.</li>
+      <li><strong>Moderate or cautious links:</strong> Use 1&nbsp;MB or 2&nbsp;MB chunks based on latency and jitter.</li>
+      <li><strong>Unstable links:</strong> Abort above 150&nbsp;ms average latency or 2% packet loss.</li>
     </ul>
 
     <div class="mermaid">
 flowchart LR
     START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
-    PING --> CHECK{Latency?}
-    CHECK -->|"Low &lt; 30ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
-    CHECK -->|"Medium 30–99ms"| MEDIUM["1 MB\npacket chunks"]
-    CHECK -->|"High ≥ 100ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+    PING --> CHECK{Link profile?}
+    CHECK -->|"avg &lt; 30ms\nmdev &lt; 10 · 0% loss"| SMALL["256 KB\npacket chunks"]
+    CHECK -->|"avg 30–80ms\nmdev ≤ 40 · 0% loss"| MEDIUM["1 MB\npacket chunks"]
+    CHECK -->|"avg 80–150ms\nloss &lt; 1%"| LARGE["2 MB\ncautious mode"]
+    CHECK -->|"avg > 150ms\nor loss > 2%"| ABORT["Abort and\nre-profile"]
     SMALL --> DIST["Distribute work\nto worker ranks"]
     MEDIUM --> DIST
     LARGE --> DIST

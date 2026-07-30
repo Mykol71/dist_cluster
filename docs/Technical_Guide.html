@@ -184,10 +184,11 @@ else:
     <div class="mermaid">
     flowchart LR
         START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
-        PING --> CHECK{Latency?}
-        CHECK -->|"Low &lt; 30ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
-        CHECK -->|"Medium 30–99ms"| MEDIUM["1 MB\npacket chunks"]
-        CHECK -->|"High ≥ 100ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+        PING --> CHECK{Link profile?}
+        CHECK -->|"avg &lt; 30ms\nmdev &lt; 10 · 0% loss"| SMALL["256 KB\npacket chunks"]
+        CHECK -->|"avg 30–80ms\nmdev ≤ 40 · 0% loss"| MEDIUM["1 MB\npacket chunks"]
+        CHECK -->|"avg 80–150ms\nloss &lt; 1%"| LARGE["2 MB\ncautious mode"]
+        CHECK -->|"avg > 150ms\nor loss > 2%"| ABORT["Abort and\nre-profile"]
         SMALL --> DIST["Distribute work\nto worker ranks"]
         MEDIUM --> DIST
         LARGE --> DIST

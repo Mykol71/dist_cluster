@@ -27,19 +27,23 @@ Adaptive Optimization (The Key Innovation)
 --
 - The Network Bottleneck: Network routing introduces erratic ping latencies that can paralyze traditional parallel cluster configurations.
 - Dynamic Packet Tuning: An automated network ping test executes right before data distribution.
-- Low Latency (Wi-Fi): Drops down to responsive 256KB packet chunks.
-- High Latency (Cellular/LTE): Automatically scales to large 2MB streaming data blocks to maximize throughput.
+- Healthy links use responsive 256 KB chunks.
+- Moderate links use 1 MB chunks; high-latency or high-jitter links use cautious 2 MB chunks.
+- Links above 150 ms average latency or 2% packet loss abort before worker launch.
 
 ```mermaid
 flowchart LR
     START([🚀 Start Cluster]) --> PING["📡 ping_test.py\nprobe each node"]
-    PING --> CHECK{Latency?}
-    CHECK -->|"Low ≤ ~20ms\n(Wi-Fi)"| SMALL["256 KB\npacket chunks"]
-    CHECK -->|"High > ~20ms\n(Cellular / LTE)"| LARGE["2 MB\nstreaming blocks"]
+    PING --> CHECK{Link profile?}
+    CHECK -->|"avg < 30ms\nmdev < 10 · 0% loss"| SMALL["256 KB\npacket chunks"]
+    CHECK -->|"avg 30–80ms\nmdev ≤ 40 · 0% loss"| MEDIUM["1 MB\npacket chunks"]
+    CHECK -->|"avg 80–150ms\nloss < 1%"| LARGE["2 MB\ncautious mode"]
+    CHECK -->|"avg > 150ms\nor loss > 2%"| ABORT["Abort and\nre-profile"]
     SMALL --> DIST["Distribute work\nto worker ranks"]
+    MEDIUM --> DIST
     LARGE --> DIST
     DIST --> COMPUTE["Workers compute\ndot-product loops"]
-    COMPUTE --> AGG["Master aggregates\nall_sum collective"]
+    COMPUTE --> AGG["Master validates and\nreassembles row ranges"]
     AGG --> DONE([✅ Result])
 ```
 
