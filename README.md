@@ -171,6 +171,20 @@ python3 tests/test_llm_workflow.py
 See [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) for remote ring and
 JACCL hostfile examples.
 
+### NumPy LLM use case
+
+Run a tiny, deterministic decoder-only Transformer implemented with NumPy to
+inspect the core operations behind autoregressive generation. This is an
+educational smoke test, not a pretrained model:
+
+```bash
+python3 src/numpy_llm_demo.py --prompt "numpy makes tensor math clear"
+python3 tests/test_numpy_llm_demo.py
+```
+
+See [`docs/NumPy_LLM_Use_Case.md`](docs/NumPy_LLM_Use_Case.md) for the
+architecture-to-operation mapping and appropriate use cases.
+
 ---
 
 ## File Structure
@@ -213,6 +227,7 @@ requirements-llm.txt         # Mac-only MLX-LM dependency
 | [`docs/run_commands.md`](docs/run_commands.md) | Step-by-step reproducible commands for the full workflow |
 | [`docs/Technical_Guide.md`](docs/Technical_Guide.md) | Extended architecture notes, slide outline, and source quality notes |
 | [`docs/AI_LLM_Use_Case.md`](docs/AI_LLM_Use_Case.md) | Executable MLX-LM pipeline inference, including local, ring, and JACCL workflows |
+| [`docs/NumPy_LLM_Use_Case.md`](docs/NumPy_LLM_Use_Case.md) | Tiny decoder-only Transformer inference implemented with NumPy |
 | [`docs/Docker_Deployment_Guide.md`](docs/Docker_Deployment_Guide.md) | Container-driven deployment guide: local test cluster and multi-machine WireGuard setup |
 
 By default, Linux/iPhone-style workers deploy into `/app`, while macOS workers deploy into `~/dist_cluster`. Set `REMOTE_PROJECT_DIR` before running the scripts to override that path for every worker.

@@ -312,6 +312,35 @@ bash run_llm_cluster.sh \
 
     <hr />
 
+    <h2>NumPy LLM Use Case</h2>
+
+    <p>
+      Explore the numerical core of a decoder-only Transformer without model
+      downloads, GPU dependencies, or Apple-Silicon-only tooling. The compact
+      NumPy example implements token and position embeddings, causal
+      self-attention, a residual MLP block, and autoregressive decoding.
+    </p>
+
+    <div class="callout">
+      <strong>Educational by design:</strong> the demo uses deterministic
+      illustration weights, so it is ideal for learning and environment smoke
+      tests—not meaningful text generation.
+    </div>
+
+    <pre><code>python3 -m pip install -r requirements.txt
+python3 src/numpy_llm_demo.py \
+  --prompt "numpy makes tensor math clear" \
+  --max-new-tokens 8
+python3 tests/test_numpy_llm_demo.py</code></pre>
+
+    <p>
+      See the <a href="docs/NumPy_LLM_Use_Case.html">NumPy LLM use case guide</a>
+      for an LLM-component-to-NumPy-operation mapping and guidance on when to
+      use this local demonstration versus the MLX-LM pipeline.
+    </p>
+
+    <hr />
+
     <h2>File Structure</h2>
 
     <pre><code>deploy_cluster.sh            # Node provisioning: connectivity, packages, file sync
@@ -322,8 +351,10 @@ log_metrics.py               # Telemetry logging and CSV output
 generate_report.py           # Final Markdown report generation
 src/train_dist.py            # Distributed compute entrypoint (runs on each rank)
 src/ping_test.py             # Network latency probe (returns buffer recommendation)
+src/numpy_llm_demo.py        # Educational NumPy decoder-only Transformer
 tests/test_local_cluster.py  # Local master/two-worker protocol smoke test
 tests/test_llm_workflow.py   # MLX-LM command-construction smoke test
+tests/test_numpy_llm_demo.py # Deterministic NumPy Transformer smoke test
 requirements.txt             # Python runtime dependencies
 requirements-llm.txt         # Mac-only MLX-LM dependency
 docker/                      # Reproducible local Docker cluster
@@ -362,6 +393,7 @@ docs/Technical_Guide.html    # Web-rendered technical guide for Pages</code></pr
         <tr><td><a href="docs/run_commands.html">Reproducible run commands</a></td><td>Step-by-step commands for the full workflow</td></tr>
         <tr><td><a href="docs/Technical_Guide.html">docs/Technical_Guide.html</a></td><td>Extended architecture notes, slide outline, and source quality notes</td></tr>
         <tr><td><a href="docs/AI_LLM_Use_Case.html">Executable MLX-LM workflow</a></td><td>Runnable local, ring, and JACCL pipeline inference on Apple Silicon Macs</td></tr>
+        <tr><td><a href="docs/NumPy_LLM_Use_Case.html">NumPy LLM use case</a></td><td>Tiny decoder-only Transformer inference using only NumPy</td></tr>
         <tr><td><a href="docs/Docker_Deployment_Guide.html">docs/Docker_Deployment_Guide.html</a></td><td>Container-driven deployment guide: local test cluster and manual multi-machine WireGuard setup</td></tr>
       </tbody>
     </table>
